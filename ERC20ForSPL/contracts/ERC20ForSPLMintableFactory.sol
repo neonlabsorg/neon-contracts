@@ -23,7 +23,6 @@ contract ERC20ForSPLMintableFactory is OwnableUpgradeable, UUPSUpgradeable {
     address private _owner;
     mapping(bytes32 => address) public tokensData;
     address[] public tokens;
-    address public beacon;
 
     event TokenDeploy(bytes32 indexed tokenMint, address indexed token);
     event Upgraded(address indexed implementation);

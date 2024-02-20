@@ -22,7 +22,6 @@ contract ERC20ForSPLFactory is OwnableUpgradeable, UUPSUpgradeable {
     address private _owner;
     mapping(bytes32 => Token) public tokensData;
     address[] public tokens;
-    address public beacon;
 
     struct Token {
         address token;

@@ -484,7 +484,6 @@ describe('Test init', async function () {
             // deploy new Factory's UUPS implementation
             const ERC20ForSPLFactoryV2Impl = await ethers.deployContract('ERC20ForSPLFactoryV2');
             await ERC20ForSPLFactoryV2Impl.waitForDeployment();
-            console.log(ERC20ForSPLFactoryV2Impl.target, 'Factory\'s V2 UUPS implementation');
             
             // user1 is not allowed to upgrade the factory's UUPS implementation
             await expect(
@@ -503,7 +502,6 @@ describe('Test init', async function () {
 
         it('Test UUPS contract upgrade', async function () {
             const factoryOwner = await ERC20ForSPLFactory.owner();
-            const factoryBeacon = await ERC20ForSPLFactory.beacon();
             const factoryBeaconImplementation = await ERC20ForSPLFactory.implementation();
             const factoryBeaconImplementationSlot = AbiCoder.decode(['address'], await ethers.provider.getStorage(ERC20ForSPLFactory.target, STORAGE_SLOTS.FACTORY.BEACON_IMPL));
             const factoryUUPSImplementationSlot = AbiCoder.decode(['address'], await ethers.provider.getStorage(ERC20ForSPLFactory.target, STORAGE_SLOTS.FACTORY.UUPS_IMP));
@@ -513,7 +511,6 @@ describe('Test init', async function () {
             const ERC20ForSPLFactoryV2UUPSFactory = await hre.ethers.getContractFactory('ERC20ForSPLFactoryV2');
             const ERC20ForSPLFactoryV2Impl = await ethers.deployContract('ERC20ForSPLFactoryV2');
             await ERC20ForSPLFactoryV2Impl.waitForDeployment();
-            console.log(ERC20ForSPLFactoryV2Impl.target, 'Factory\'s V2 UUPS implementation');
 
             // upgrade to new Factory's UUPS implementation
             let tx = await ERC20ForSPLFactory.upgradeToAndCall(ERC20ForSPLFactoryV2Impl.target, '0x');
@@ -523,7 +520,6 @@ describe('Test init', async function () {
 
             expect(ERC20ForSPLFactoryV2.target).to.eq(ERC20ForSPLFactory.target);
             expect(factoryOwner).to.eq(await ERC20ForSPLFactoryV2.owner());
-            expect(factoryBeacon).to.eq(await ERC20ForSPLFactoryV2.beacon());
             expect(factoryBeaconImplementation).to.eq(await ERC20ForSPLFactoryV2.implementation());
             expect(await ERC20ForSPLFactoryV2.getDummyData()).to.eq(678910);
 
