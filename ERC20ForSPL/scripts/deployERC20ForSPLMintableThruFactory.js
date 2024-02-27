@@ -16,7 +16,7 @@ async function main() {
     let tx = await ERC20ForSPLFactoryInstance.deploy(
         'Test Token',
         'TST',
-        '{"name": "Test Token", "symbol": "TST", "description": "This is a test token.", "image": "https://www.shutterstock.com/image-vector/sample-red-square-grunge-stamp-260nw-338250266.jpg"}',
+        'http://integration-test-link.neoninfra.xyz/erc20forspl-info.json',
         9,
         owner.address
     );

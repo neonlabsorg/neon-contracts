@@ -57,7 +57,7 @@ describe('Test init', async function () {
         let tx = await ERC20ForSPLMintableFactory.deploy(
             'Testcoin',
             'TST',
-            '{"name": "Test Token", "symbol": "TST", "description": "This is a test token.", "image": "https://www.shutterstock.com/image-vector/sample-red-square-grunge-stamp-260nw-338250266.jpg"}',
+            'http://integration-test-link.neoninfra.xyz/erc20forspl-info.json',
             9
         );
         await tx.wait(RECEIPTS_COUNT);
@@ -68,7 +68,7 @@ describe('Test init', async function () {
         console.log('\nCreating instance of just now deployed ERC20ForSPLMintable contract with address', "\x1b[32m", ERC20ForSPLMintable.target, "\x1b[30m", '\n');
         console.log(await ERC20ForSPLMintable.name(), 'name');
         console.log(await ERC20ForSPLMintable.symbol(), 'symbol');
-        console.log(JSON.parse(await ERC20ForSPLMintable.uri()), 'uri');
+        console.log(await ERC20ForSPLMintable.uri(), 'uri');
 
         console.log('ERC20ForSPLMintableFactory\'s BEACON_IMPL SLOT -', await ethers.provider.getStorage(ERC20ForSPLMintableFactory.target, STORAGE_SLOTS.FACTORY.BEACON_IMPL));
         console.log('ERC20ForSPLMintableFactory\'s UUPS_IMP SLOT -', await ethers.provider.getStorage(ERC20ForSPLMintableFactory.target, STORAGE_SLOTS.FACTORY.UUPS_IMP));
