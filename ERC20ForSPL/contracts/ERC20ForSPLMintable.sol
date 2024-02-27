@@ -27,6 +27,7 @@ contract ERC20ForSPLMintable is ERC20ForSPLBackbone, Initializable, OwnableUpgra
     function initialize(
         string memory _name,
         string memory _symbol,
+        string memory _uri,
         uint8 _decimals,
         address _owner
     ) public initializer {
@@ -34,7 +35,7 @@ contract ERC20ForSPLMintable is ERC20ForSPLBackbone, Initializable, OwnableUpgra
 
         if (_decimals > 9) revert InvalidDecimals();
         
-        bytes32 _tokenMint = _initialize(_name, _symbol, _decimals);
+        bytes32 _tokenMint = _initialize(_name, _symbol, _uri, _decimals);
         if (!SPL_TOKEN.getMint(_tokenMint).isInitialized) revert InvalidTokenMint();
         if (!METAPLEX.isInitialized(_tokenMint)) revert MissingMetaplex();
 
@@ -65,10 +66,11 @@ contract ERC20ForSPLMintable is ERC20ForSPLBackbone, Initializable, OwnableUpgra
     function _initialize(
         string memory _name,
         string memory _symbol,
+        string memory _uri,
         uint8 _decimals
     ) private returns (bytes32) {
         bytes32 mintAddress = SPL_TOKEN.initializeMint(bytes32(0), _decimals);
-        METAPLEX.createMetadata(mintAddress, _name, _symbol, "");
+        METAPLEX.createMetadata(mintAddress, _name, _symbol, _uri);
         return mintAddress;
     }
 }

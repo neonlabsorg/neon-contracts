@@ -57,6 +57,7 @@ describe('Test init', async function () {
         let tx = await ERC20ForSPLMintableFactory.deploy(
             'Testcoin',
             'TST',
+            'https://pbs.twimg.com/profile_images/1708826035695853568/TxbDTDsu_400x400.jpg',
             9
         );
         await tx.wait(RECEIPTS_COUNT);
@@ -64,7 +65,10 @@ describe('Test init', async function () {
         let tokenAddress = await ERC20ForSPLMintableFactory.tokens(0);
 
         ERC20ForSPLMintable = ERC20ForSPLMintableContractFactory.attach(tokenAddress);
-        console.log('\nCreating instance of just now deployed ERC20ForSPLMintable contract with address', "\x1b[32m", ERC20ForSPLMintable.target, "\x1b[30m", '\n'); 
+        console.log('\nCreating instance of just now deployed ERC20ForSPLMintable contract with address', "\x1b[32m", ERC20ForSPLMintable.target, "\x1b[30m", '\n');
+        console.log(await ERC20ForSPLMintable.name(), 'name');
+        console.log(await ERC20ForSPLMintable.symbol(), 'symbol');
+        console.log(await ERC20ForSPLMintable.uri(), 'uri');
 
         console.log('ERC20ForSPLMintableFactory\'s BEACON_IMPL SLOT -', await ethers.provider.getStorage(ERC20ForSPLMintableFactory.target, STORAGE_SLOTS.FACTORY.BEACON_IMPL));
         console.log('ERC20ForSPLMintableFactory\'s UUPS_IMP SLOT -', await ethers.provider.getStorage(ERC20ForSPLMintableFactory.target, STORAGE_SLOTS.FACTORY.UUPS_IMP));
@@ -360,6 +364,7 @@ describe('Test init', async function () {
                 ERC20ForSPLMintableImplementation.initialize(
                     'Testcoin',
                     'TST',
+                    '',
                     9,
                     ethers.Wallet.createRandom()
                 )
@@ -381,6 +386,7 @@ describe('Test init', async function () {
             let tx = await ERC20ForSPLMintableFactory.deploy(
                 'Testcoin#2',
                 'TST#2',
+                '',
                 6
             );
             await tx.wait(RECEIPTS_COUNT);

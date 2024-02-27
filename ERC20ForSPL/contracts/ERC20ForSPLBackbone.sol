@@ -32,14 +32,19 @@ contract ERC20ForSPLBackbone {
     error InvalidTokenMint();
     error AmountExceedsUint64();
 
-    /// @notice Returns the name of the SPLToken, the name is stored in Metaplex protocol
+    /// @notice Returns the name of the SPLToken, the name is stored in the Metaplex protocol
     function name() public view returns (string memory) {
         return METAPLEX.name(tokenMint);
     }
 
-    /// @notice Returns the symbol of the SPLToken, the symbol is stored in Metaplex protocol
+    /// @notice Returns the symbol of the SPLToken, the symbol is stored in the Metaplex protocol
     function symbol() public view returns (string memory) {
         return METAPLEX.symbol(tokenMint);
+    }
+
+    /// @notice Returns the uri of the SPLToken, the uri is stored in the Metaplex protocol
+    function uri() public view returns (string memory) {
+        return METAPLEX.uri(tokenMint);
     }
 
     /// @notice Returns the decimals of the SPLToken

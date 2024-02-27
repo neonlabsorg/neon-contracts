@@ -86,6 +86,7 @@ contract ERC20ForSPLMintableFactory is OwnableUpgradeable, UUPSUpgradeable {
     function deploy(
         string memory _name,
         string memory _symbol,
+        string memory _uri,
         uint8 _decimals
     ) external {
         BeaconProxy token = new BeaconProxy(
@@ -94,6 +95,7 @@ contract ERC20ForSPLMintableFactory is OwnableUpgradeable, UUPSUpgradeable {
                 ERC20ForSPLMintable(address(0)).initialize.selector, 
                 _name,
                 _symbol,
+                _uri,
                 _decimals,
                 msg.sender
             )

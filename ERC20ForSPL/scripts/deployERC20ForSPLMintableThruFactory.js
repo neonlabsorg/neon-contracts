@@ -16,6 +16,7 @@ async function main() {
     let tx = await ERC20ForSPLFactoryInstance.deploy(
         'Test Token',
         'TST',
+        '',
         9,
         owner.address
     );

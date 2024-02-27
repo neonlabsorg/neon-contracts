@@ -2,7 +2,7 @@
 
 This repo contains an example of how to deploy and use the ERC20ForSPL standard. But first what is the difference between **ERC20ForSPL** and **ERC20ForSPLMintable**:
 * **ERC20ForSPL** - Allows you to deploy the standard on Neon EVM for an already existing SPLToken on Solana. This smart contract accepts only 1 constructor parameter _( `bytes32 _tokenMint` )_ which is the public address of the SPLToken on Solana _( HEX decoded )_.
-* **ERC20ForSPLMintable** - Allows you to deploy the standard on Neon EVM as well as deploying a new SPLToken on Solana. The constructor accepts 4 parameters _( ` string memory _name, string memory _symbol, uint8 _decimals, address _owner `)_ which are needed to deploy the SPLToken and to submit the token metadata to the Metaplex protocol on Solana.
+* **ERC20ForSPLMintable** - Allows you to deploy the standard on Neon EVM as well as deploying a new SPLToken on Solana. The constructor accepts 4 parameters _( ` string memory _name, string memory _symbol, string memory _uri, uint8 _decimals, address _owner `)_ which are needed to deploy the SPLToken and to submit the token metadata to the Metaplex protocol on Solana. **<u>Warning</u>** - the `_uri` parameter is used by the Solana explorers to display the token image. Setting this parameter is one time process and cannot be updated afterwards.
 
 Basically this standard allows you to interact with a token which exists natively on both chains of Neon EVM and Solana. This token can be transferred between Neon EVM and Solana EOAs, example:
 * Method to transfer tokens to Neon EVM address - `function transfer(address to, uint256 amount) public returns (bool)`
@@ -41,3 +41,9 @@ Like mentioned before ERC20ForSPL is used when we have an already existing SPLTo
 ERC20ForSPLMintable is used when we don't have an existing SPLToken and we want to deploy one. The steps to produce the ERC20ForSPLMintable's tests are lesser - we don't have to fill in our testers balances with a transaction from Solana to Neon, because the ERC20ForSPLMintable smart contract includes a minting method which we can use in our tests `function mint(address to, uint256 amount) public onlyOwner`.
 
 To run the ERC20ForSPLMintable tests run the following command - `npx hardhat test --network neondevnet test/ERC20ForSPLMintable.js`.
+
+## Forked OpenZeppelin library
+The reason for forking the OpenZeppelin library is because the original library allocates storage slots randomly for the UUPS and the BeaconProxy standards, which is not a blocker for deploying on Neon EVM, but it would take more deployment fees. Moving these storage slots in the first 64 storage slots of the smart contracts saves transaction costs. Тhis is the list of the implemented changes in the forked OpenZeppelin library:
+* `contracts/openzeppelin-fork/contracts-upgradeable/access/OwnableUpgradeable.sol` - at line 28 the storage slot for variable `OwnableStorageLocation` is changed to `0x0000000000000000000000000000000000000000000000000000000000000002`.
+* `contracts/openzeppelin-fork/contracts/proxy/ERC1967/ERC1967Utils.sol` - at line 37 the storage slot for variable `IMPLEMENTATION_SLOT` is changed to `0x0000000000000000000000000000000000000000000000000000000000000001`.
+* `contracts/openzeppelin-fork/contracts/proxy/ERC1967/ERC1967Utils.sol` - at line 137 the storage slot for variable `BEACON_SLOT` is changed to `0x0000000000000000000000000000000000000000000000000000000000000000`.
