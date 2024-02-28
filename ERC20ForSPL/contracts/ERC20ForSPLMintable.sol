@@ -12,8 +12,6 @@ import './ERC20ForSPLBackbone.sol';
 /// @dev This contract is being used as a BeaconProxy implementation. The Beacon is defined and inherited from ERC20ForSPLBackbone.sol at storage slot 0.
 /// @custom:oz-upgrades-unsafe-allow constructor
 contract ERC20ForSPLMintable is ERC20ForSPLBackbone, Initializable, OwnableUpgradeable {
-    error InvalidDecimals();
-
     /// @notice Disabling the initializers to prevent the implementation getting hijacked
     constructor() {
         _disableInitializers();
@@ -32,8 +30,6 @@ contract ERC20ForSPLMintable is ERC20ForSPLBackbone, Initializable, OwnableUpgra
         address _owner
     ) public initializer {
         __Ownable_init(_owner);
-
-        if (_decimals > 9) revert InvalidDecimals();
         
         bytes32 _tokenMint = _initialize(_name, _symbol, _uri, _decimals);
         if (!SPL_TOKEN.getMint(_tokenMint).isInitialized) revert InvalidTokenMint();

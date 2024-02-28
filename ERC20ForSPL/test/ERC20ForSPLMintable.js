@@ -14,7 +14,7 @@ describe('Test init', async function () {
     let ownerSolanaPublicKey;
     let user1SolanaPublicKey;
     let user2SolanaPublicKey;
-    const TOKEN_MINT_DECIMALS = 9; // never higher than 9 for ERC20ForSPL
+    const TOKEN_MINT_DECIMALS = 9;
     const INITIAL_OWNER_BALANCE = ethers.parseUnits('1000000', TOKEN_MINT_DECIMALS);
     const INITIAL_USER_BALANCE = ethers.parseUnits('150', TOKEN_MINT_DECIMALS);
     const RECEIPTS_COUNT = 10;
