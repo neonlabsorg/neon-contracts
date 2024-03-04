@@ -88,7 +88,7 @@ contract ERC20ForSPLMintableFactory is OwnableUpgradeable, UUPSUpgradeable {
         string memory _symbol,
         string memory _uri,
         uint8 _decimals
-    ) external {
+    ) external returns(bytes32, address) {
         BeaconProxy token = new BeaconProxy(
             address(this),
             abi.encodeWithSelector(
@@ -106,5 +106,6 @@ contract ERC20ForSPLMintableFactory is OwnableUpgradeable, UUPSUpgradeable {
         tokens.push(address(token));
 
         emit TokenDeploy(tokenMint, address(token));
+        return (tokenMint, address(token));
     }
 }
