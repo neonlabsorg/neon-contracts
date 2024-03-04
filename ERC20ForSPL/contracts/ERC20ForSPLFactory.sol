@@ -107,7 +107,7 @@ contract ERC20ForSPLFactory is OwnableUpgradeable, UUPSUpgradeable {
 
     /// @notice Deploys a new ERC20ForSPL's BeaconProxy instance
     /// @param tokenMint The Solana-like address of the Token Mint on Solana
-    function deploy(bytes32 tokenMint) external {
+    function deploy(bytes32 tokenMint) external returns(address) {
         if (tokensData[tokenMint].token != address(0)) revert AlreadyExistingERC20ForSPL();
 
         BeaconProxy token = new BeaconProxy(
@@ -122,5 +122,6 @@ contract ERC20ForSPLFactory is OwnableUpgradeable, UUPSUpgradeable {
         tokens.push(address(token));
 
         emit TokenDeploy(tokenMint, address(token));
+        return address(token);
     }
 }
