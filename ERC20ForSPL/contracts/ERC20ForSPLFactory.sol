@@ -11,9 +11,9 @@ import "./ERC20ForSPL.sol";
 /// @author https://twitter.com/mnedelchev_
 /// @notice This contract serve as a factory to deploy interface contracts of already deployed SPLToken on Solana.
 /// @dev This contract is built with forked OpenZeppelin's UUPS standard and it's a Beacon contract at the same time. The storage is defined in the following way:
-/// @dev Storage slot 0 - taken by the forked BeaconProxy's implementation.
-/// @dev Storage slot 1 - taken by the forked UUPS's implementation.
-/// @dev Storage slot 2 - taken by the forked OwnableUpgradeable's owner.
+/// @dev Storage slot 0 - reserved for the forked BeaconProxy's implementation.
+/// @dev Storage slot 1 - reserved for the forked UUPS's implementation.
+/// @dev Storage slot 2 - reserved for the forked OwnableUpgradeable's owner.
 /// @dev Every next slot is defined by the needs of the ERC20ForSPLFactory.
 /// @custom:oz-upgrades-unsafe-allow constructor
 contract ERC20ForSPLFactory is OwnableUpgradeable, UUPSUpgradeable {
