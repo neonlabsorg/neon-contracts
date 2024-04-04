@@ -37,7 +37,7 @@ describe('Test init', async function () {
         const ERC20ForSPLContractFactory = await ethers.getContractFactory('ERC20ForSPL');
 
         if (ethers.isAddress(ERC20ForSPLAddress)) {
-            console.log('\nCreating instance of already deployed ERC20ForSPL contract with address', "\x1b[32m", ERC20ForSPLAddress, "\x1b[30m", '\n');
+            console.log('\nCreating instance of already deployed ERC20ForSPL contract on Neon EVM with address', "\x1b[32m", ERC20ForSPLAddress, "\x1b[30m", '\n');
             ERC20ForSPL = ERC20ForSPLContractFactory.attach(ERC20ForSPLAddress);
             ERC20ForSPLFactory = ERC20ForSPLFactoryUUPSFactory.attach(await ERC20ForSPL.beacon());
         } else {
@@ -77,7 +77,7 @@ describe('Test init', async function () {
 
             ERC20ForSPL = ERC20ForSPLContractFactory.attach(tokensData[0]);
             ERC20ForSPLAddress = ERC20ForSPL.target;
-            console.log('\nCreating instance of just now deployed ERC20ForSPL contract with address', "\x1b[32m", ERC20ForSPL.target, "\x1b[30m", '\n'); 
+            console.log('\nCreating instance of just now deployed ERC20ForSPL contract on Neon EVM with address', "\x1b[32m", ERC20ForSPL.target, "\x1b[30m", '\n'); 
         }
 
         console.log('ERC20ForSPLFactory\'s BEACON_IMPL SLOT -', await ethers.provider.getStorage(ERC20ForSPLFactory.target, STORAGE_SLOTS.FACTORY.BEACON_IMPL));
