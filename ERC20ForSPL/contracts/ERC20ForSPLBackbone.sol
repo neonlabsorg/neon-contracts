@@ -29,6 +29,7 @@ contract ERC20ForSPLBackbone {
     error EmptyAddress();
     error InvalidSystemAccount();
     error InvalidAllowance();
+    error InvalidApprove();
     error AmountExceedsBalance();
     error MissingMetaplex();
     error InvalidTokenMint();
@@ -189,6 +190,7 @@ contract ERC20ForSPLBackbone {
     /// @notice Internal method to keep records inside the _allowances mapping
     function _approve(address owner, address spender, uint256 amount) internal {
         if (owner == address(0) || spender == address(0)) revert EmptyAddress();
+        if (amount > type(uint64).max) revert InvalidApprove();
 
         _allowances[owner][spender] = amount;
         emit Approval(owner, spender, amount);
@@ -197,7 +199,7 @@ contract ERC20ForSPLBackbone {
     /// @notice Internal method to update the _allowances mapping on spending
     function _spendAllowance(address owner, address spender, uint256 amount) internal {
         uint256 currentAllowance = allowance(owner, spender);
-        if (currentAllowance != type(uint256).max) {
+        if (currentAllowance != type(uint64).max) {
             if (currentAllowance < amount) revert InvalidAllowance();
             _approve(owner, spender, currentAllowance - amount);
         }
