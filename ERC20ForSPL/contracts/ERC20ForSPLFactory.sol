@@ -29,12 +29,15 @@ contract ERC20ForSPLFactory is OwnableUpgradeable, UUPSUpgradeable {
     }
 
     enum State {
+        NonExisting,
         New,
-        AlreadyExisting
+        AlreadyExisting,
+        Deprecated
     }
 
     event TokenDeploy(bytes32 indexed tokenMint, address indexed token);
     event Upgraded(address indexed implementation);
+    event ERC20ForSPLTrack(bytes32[] tokenMints, address[] alreadyExistingTokens);
 
     error InvalidTokenData();
     error AlreadyExistingERC20ForSPL();
@@ -80,14 +83,28 @@ contract ERC20ForSPLFactory is OwnableUpgradeable, UUPSUpgradeable {
         if (tokensLen != tokenMints.length) revert InvalidTokenData();
 
         for (uint i; i < tokensLen; ++i) {
-            if (tokensData[tokenMints[i]].token != address(0)) revert AlreadyExistingERC20ForSPL();
+            if (alreadyExistingTokens[i] != address(0)) {
+                if (tokensData[tokenMints[i]].token != address(0)) revert AlreadyExistingERC20ForSPL();
+                
+                if (tokensData[tokenMints[i]].state == State.NonExisting) {
+                    tokens.push(alreadyExistingTokens[i]);
+                }
 
-            tokensData[tokenMints[i]] = Token({
-                token: alreadyExistingTokens[i],
-                state: State.AlreadyExisting
-            });
-            tokens.push(alreadyExistingTokens[i]);
+                tokensData[tokenMints[i]] = Token({
+                    token: alreadyExistingTokens[i],
+                    state: State.AlreadyExisting
+                });
+            } else {
+                if (tokensData[tokenMints[i]].state == State.AlreadyExisting) {
+                    tokensData[tokenMints[i]] = Token({
+                        token: address(0),
+                        state: State.Deprecated
+                    });
+                }
+            }
         }
+
+        emit ERC20ForSPLTrack(tokenMints, alreadyExistingTokens);
     }
 
     /**
