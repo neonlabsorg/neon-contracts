@@ -52,7 +52,8 @@ contract ERC20ForSPLFactory is OwnableUpgradeable, UUPSUpgradeable {
     /// @param implementation_ The address of the BeaconProxy initial implementation
     function initialize(address implementation_) public initializer {       
         __Ownable_init(msg.sender);
-         _setImplementation(implementation_);
+        __UUPSUpgradeable_init();
+        _setImplementation(implementation_);
     }
 
     function _authorizeUpgrade(address) internal override onlyOwner {}
