@@ -9,7 +9,8 @@ import './interfaces/IMetaplex.sol';
 /// @author https://twitter.com/mnedelchev_
 /// @notice This contract serves as a backbone contract for both ERC20ForSPL and ERC20ForSPLMintable smart contracts. ERC20ForSPLBackbone contains the core logic of the ERC20ForSPL meanwhile in ERC20ForSPL and ERC20ForSPLMintable smart contracts 
 /// @dev This contract is part of a BeaconProxy contract. The storage is defined in the following way:
-/// @dev Storage slot 0 - taken by the Beacon address.
+/// @dev Storage slot 0 - reserved for the Beacon address.
+/// @dev Storage slot 2 - reserved for the forked OwnableUpgradeable's owner.
 /// @dev Every next slot is defined by the needs of the ERC20ForSPL standard.
 contract ERC20ForSPLBackbone {
     ISPLToken public constant SPL_TOKEN = ISPLToken(0xFf00000000000000000000000000000000000004);
@@ -17,6 +18,7 @@ contract ERC20ForSPLBackbone {
     
     address public beacon;
     bytes32 public tokenMint;
+    address private _owner;
     mapping(address => mapping(address => uint256)) private _allowances;
 
     event Transfer(address indexed from, address indexed to, uint256 amount);
@@ -27,6 +29,7 @@ contract ERC20ForSPLBackbone {
     error EmptyAddress();
     error InvalidSystemAccount();
     error InvalidAllowance();
+    error InvalidApprove();
     error AmountExceedsBalance();
     error MissingMetaplex();
     error InvalidTokenMint();
@@ -187,6 +190,7 @@ contract ERC20ForSPLBackbone {
     /// @notice Internal method to keep records inside the _allowances mapping
     function _approve(address owner, address spender, uint256 amount) internal {
         if (owner == address(0) || spender == address(0)) revert EmptyAddress();
+        if (amount > type(uint64).max) revert InvalidApprove();
 
         _allowances[owner][spender] = amount;
         emit Approval(owner, spender, amount);
@@ -195,7 +199,7 @@ contract ERC20ForSPLBackbone {
     /// @notice Internal method to update the _allowances mapping on spending
     function _spendAllowance(address owner, address spender, uint256 amount) internal {
         uint256 currentAllowance = allowance(owner, spender);
-        if (currentAllowance != type(uint256).max) {
+        if (currentAllowance != type(uint64).max) {
             if (currentAllowance < amount) revert InvalidAllowance();
             _approve(owner, spender, currentAllowance - amount);
         }

@@ -37,7 +37,7 @@ describe('Test init', async function () {
         const ERC20ForSPLContractFactory = await ethers.getContractFactory('ERC20ForSPL');
 
         if (ethers.isAddress(ERC20ForSPLAddress)) {
-            console.log('\nCreating instance of already deployed ERC20ForSPL contract with address', "\x1b[32m", ERC20ForSPLAddress, "\x1b[30m", '\n');
+            console.log('\nCreating instance of already deployed ERC20ForSPL contract on Neon EVM with address', "\x1b[32m", ERC20ForSPLAddress, "\x1b[30m", '\n');
             ERC20ForSPL = ERC20ForSPLContractFactory.attach(ERC20ForSPLAddress);
             ERC20ForSPLFactory = ERC20ForSPLFactoryUUPSFactory.attach(await ERC20ForSPL.beacon());
         } else {
@@ -77,7 +77,7 @@ describe('Test init', async function () {
 
             ERC20ForSPL = ERC20ForSPLContractFactory.attach(tokensData[0]);
             ERC20ForSPLAddress = ERC20ForSPL.target;
-            console.log('\nCreating instance of just now deployed ERC20ForSPL contract with address', "\x1b[32m", ERC20ForSPL.target, "\x1b[30m", '\n'); 
+            console.log('\nCreating instance of just now deployed ERC20ForSPL contract on Neon EVM with address', "\x1b[32m", ERC20ForSPL.target, "\x1b[30m", '\n'); 
         }
 
         console.log('ERC20ForSPLFactory\'s BEACON_IMPL SLOT -', await ethers.provider.getStorage(ERC20ForSPLFactory.target, STORAGE_SLOTS.FACTORY.BEACON_IMPL));
@@ -472,6 +472,59 @@ describe('Test init', async function () {
                     ['0x512E48836Cd42F3eB6f50CEd9ffD81E0a7F15103']
                 )
             ).to.be.reverted;
+        });
+
+        it('Validate method addAlreadyExistingERC20ForSPL proper updating of a tokenData', async function () {
+            let usdcTokenMint = '0xd0d6b2043fb14bea672e7e74fa09ce4a42e384bdc302e6d1d854127039afe07a';
+            let correctUsdcAddress = '0x512E48836Cd42F3eB6f50CEd9ffD81E0a7F15103';
+            let tokensData = await ERC20ForSPLFactory.tokensData(usdcTokenMint);
+            if (tokensData[0] == ethers.ZeroAddress) {
+                // adding USDC with false ethereum-like address
+                let randomAddress = ethers.Wallet.createRandom().address;
+                let tx = await ERC20ForSPLFactory.addAlreadyExistingERC20ForSPL(
+                    [
+                        usdcTokenMint
+                    ],
+                    [
+                        randomAddress
+                    ]
+                );
+                await tx.wait(RECEIPTS_COUNT);
+                tokensData = await ERC20ForSPLFactory.tokensData(usdcTokenMint);
+                expect(tokensData[0]).to.eq(randomAddress);
+                expect(tokensData[1]).to.eq(2); // state AlreadyExisting
+
+                // realizing that we've added USDC with wrong ethereum-like address
+                tx = await ERC20ForSPLFactory.addAlreadyExistingERC20ForSPL(
+                    [
+                        usdcTokenMint
+                    ],
+                    [
+                        ethers.ZeroAddress
+                    ]
+                );
+                await tx.wait(RECEIPTS_COUNT);
+                tokensData = await ERC20ForSPLFactory.tokensData(usdcTokenMint);
+                expect(tokensData[0]).to.eq(ethers.ZeroAddress);
+                expect(tokensData[1]).to.eq(3); // state Deprecated 
+
+                // fixing the USDC token mint with the correct ethereum-like address
+                tx = await ERC20ForSPLFactory.addAlreadyExistingERC20ForSPL(
+                    [
+                        usdcTokenMint
+                    ],
+                    [
+                        correctUsdcAddress
+                    ]
+                );
+                await tx.wait(RECEIPTS_COUNT);
+                tokensData = await ERC20ForSPLFactory.tokensData(usdcTokenMint);
+                expect(tokensData[0]).to.eq(correctUsdcAddress);
+                expect(tokensData[1]).to.eq(2); // state AlreadyExisting
+            } else {
+                console.log('Test \x1b[32m Validate method addAlreadyExistingERC20ForSPL proper updating of a tokenData \x1b[30m has been already executed.');
+                this.skip();
+            }
         });
 
         it('Malicious change of owner ( supposed to revert )', async function () {
