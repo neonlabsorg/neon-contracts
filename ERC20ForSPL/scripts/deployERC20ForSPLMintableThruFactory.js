@@ -6,11 +6,13 @@
 // global scope, and execute the script.
 const { ethers } = require("hardhat");
 
+const FACTORY_ADDRESS = ""; //Add Devnet or Mainnet ERC20ForSPLMintable Factory address
+
 async function main() {
   const ERC20ForSPLFactoryAddress = "";
   const ERC20ForSPLFactoryInstance = await ethers.getContractAt(
     "ERC20ForSPLFactory",
-    ERC20ForSPLFactoryAddress
+    FACTORY_ADDRESS
   );
 
   let tx = await ERC20ForSPLFactoryInstance.deploy(
