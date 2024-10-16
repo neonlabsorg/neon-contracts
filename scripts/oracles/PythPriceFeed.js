@@ -7,11 +7,9 @@
 const { ethers } = require("hardhat");
 
 async function main() {
-    const PYTH_SOL_USDC_PRICE_FEED = '0x60314704340deddf371fd42472148f248e9d1a6d1a5eb2ac3acd8b7fd5d6b243';
-    const PythPriceFeedFactory = await ethers.getContractFactory(
-        "PythPriceFeed"
-    );
-    const PythPriceFeedAddress = "0x4085D39Dc9c97650EB2E69eb9e79B8acc2a28C00";
+    const PYTH_SOL_USD_PRICE_FEED = '0x60314704340deddf371fd42472148f248e9d1a6d1a5eb2ac3acd8b7fd5d6b243'; // 7UVimffxr9ow1uXYxsr4LHAcV58mLzhmwaeKvJ1pjLiE
+    const PythPriceFeedFactory = await ethers.getContractFactory("PythPriceFeed");
+    const PythPriceFeedAddress = "0xBAA0533f76B071996b373b1CeA99465284603065";
     let PythPriceFeed;
 
     if (ethers.isAddress(PythPriceFeedAddress)) {
@@ -19,10 +17,9 @@ async function main() {
             PythPriceFeedAddress
         );
     } else {
-        PythPriceFeed = await ethers.deployContract(
-            "PythPriceFeed", 
-            [PYTH_SOL_USDC_PRICE_FEED]
-        );
+        PythPriceFeed = await upgrades.deployProxy(PythPriceFeedFactory, [
+            PYTH_SOL_USD_PRICE_FEED
+        ], {kind: 'uups'});
         await PythPriceFeed.waitForDeployment();
 
         console.log(

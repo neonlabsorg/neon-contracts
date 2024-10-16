@@ -1,19 +1,34 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.26;
+pragma solidity ^0.8.28;
 
+import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "../utils/SolanaDataConverterLib.sol";
 import "../precompiles/QueryAccount.sol";
 
 
-contract PythPriceFeed {
+/// @author https://twitter.com/mnedelchev_
+/// @custom:oz-upgrades-unsafe-allow constructor
+contract PythPriceFeed is OwnableUpgradeable, UUPSUpgradeable {
     using SolanaDataConverterLib for bytes;
     using SolanaDataConverterLib for uint64;
 
-    bytes32 public immutable PYTH_PRICE_FEED_ACCOUNT;
+    bytes32 public PYTH_PRICE_FEED_ACCOUNT;
 
-    constructor(bytes32 _PYTH_PRICE_FEED_ACCOUNT) {
+    error InvalidPriceFeedData();
+
+    /// @notice Disabling the initializers to prevent the implementation getting hijacked
+    constructor() {
+        _disableInitializers();
+    }
+
+    function initialize(bytes32 _PYTH_PRICE_FEED_ACCOUNT) public initializer {       
+        __Ownable_init(msg.sender);
+
         PYTH_PRICE_FEED_ACCOUNT = _PYTH_PRICE_FEED_ACCOUNT;
     }
+
+    function _authorizeUpgrade(address) internal override onlyOwner {}
 
     function latestRoundData() external view returns (
             uint80 roundId,
@@ -27,7 +42,7 @@ contract PythPriceFeed {
             0, 
             134
         );
-        require(success, "failed to query account data");
+        require(success, InvalidPriceFeedData());
 
         int64 price = (data.toUint64(73)).readLittleEndianSigned64();
         int64 publishTime = (data.toUint64(93)).readLittleEndianSigned64();
