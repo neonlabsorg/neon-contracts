@@ -5,7 +5,7 @@ import "../utils/SolanaDataConverterLib.sol";
 import "../precompiles/QueryAccount.sol";
 
 
-contract PythPriceFeeds {
+contract PythPriceFeed {
     using SolanaDataConverterLib for bytes;
     using SolanaDataConverterLib for uint64;
 

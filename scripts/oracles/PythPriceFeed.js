@@ -8,30 +8,30 @@ const { ethers } = require("hardhat");
 
 async function main() {
     const PYTH_SOL_USDC_PRICE_FEED = '0x60314704340deddf371fd42472148f248e9d1a6d1a5eb2ac3acd8b7fd5d6b243';
-    const PythPriceFeedsFactory = await ethers.getContractFactory(
-        "PythPriceFeeds"
+    const PythPriceFeedFactory = await ethers.getContractFactory(
+        "PythPriceFeed"
     );
-    const PythPriceFeedsAddress = "0xb9E8133DC36B7ED288ba541C4f792D20b40fBd63";
-    let PythPriceFeeds;
+    const PythPriceFeedAddress = "0x4085D39Dc9c97650EB2E69eb9e79B8acc2a28C00";
+    let PythPriceFeed;
 
-    if (ethers.isAddress(PythPriceFeedsAddress)) {
-        PythPriceFeeds = PythPriceFeedsFactory.attach(
-            PythPriceFeedsAddress
+    if (ethers.isAddress(PythPriceFeedAddress)) {
+        PythPriceFeed = PythPriceFeedFactory.attach(
+            PythPriceFeedAddress
         );
     } else {
-        PythPriceFeeds = await ethers.deployContract(
-            "PythPriceFeeds", 
+        PythPriceFeed = await ethers.deployContract(
+            "PythPriceFeed", 
             [PYTH_SOL_USDC_PRICE_FEED]
         );
-        await PythPriceFeeds.waitForDeployment();
+        await PythPriceFeed.waitForDeployment();
 
         console.log(
-            `PythPriceFeeds deployed to ${PythPriceFeeds.target}`
+            `PythPriceFeed deployed to ${PythPriceFeed.target}`
         );
     }
 
     console.log(
-        await PythPriceFeeds.latestRoundData(), 'latestRoundData SOL/ USDC'
+        await PythPriceFeed.latestRoundData(), 'latestRoundData SOL/ USDC'
     );
 }
 
