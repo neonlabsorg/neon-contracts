@@ -41,9 +41,9 @@ contract PythAggregatorV3 is OwnableUpgradeable, UUPSUpgradeable {
         );
         require(success, InvalidPriceFeedData());
 
-        int64 price = (data.toUint64(73)).readLittleEndianSigned64();
-        int64 publishTime = (data.toUint64(93)).readLittleEndianSigned64();
-        int32 expo = (data.toUint32(89)).readLittleEndianSigned32();
+        int64 price = (data.toUint64(73)).readLittleEndianSigned64(); // 73 bytes is the offset of the price value inside the Pyth's price feed account on Solana
+        int64 publishTime = (data.toUint64(93)).readLittleEndianSigned64(); // 93 bytes is the offset of the publish_time value inside the Pyth's price feed account on Solana
+        int32 expo = (data.toUint32(89)).readLittleEndianSigned32(); // 89 bytes is the offset of the exponent value inside the Pyth's price feed account on Solana
 
         return (price, publishTime, expo);
     }
