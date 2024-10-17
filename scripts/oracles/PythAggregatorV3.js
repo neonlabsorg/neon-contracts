@@ -7,10 +7,10 @@
 const { ethers } = require("hardhat");
 
 async function main() {
-    const PYTH_SOL_USD_PRICE_FEED_ID = '0xef0d8b6fda2ceba41da15d4095d1da392a0d2f8ed0c6c7bc0f4cfac8c280b56d';
-    const PYTH_SOL_USD_PRICE_FEED_ACCOUNT = '0x60314704340deddf371fd42472148f248e9d1a6d1a5eb2ac3acd8b7fd5d6b243'; // 7UVimffxr9ow1uXYxsr4LHAcV58mLzhmwaeKvJ1pjLiE
+    const PYTH_PRICE_FEED_ID = '0xd82183dd487bef3208a227bb25d748930db58862c5121198e723ed0976eb92b7';
+    const PYTH_PRICE_FEED_ACCOUNT = '0xd0659a310e813dd255d09668f02808dfc34d20b3c89d001758a38dee5af54fa8'; // F2VfCymdNQiCa8Vyg5E7BwEv9UPwfm8cVN6eqQLqXiGo
     const PythAggregatorV3Factory = await ethers.getContractFactory("PythAggregatorV3");
-    const PythAggregatorV3Address = "0x66D23Fc4521d75613921f6475ce1776ed4A8F109";
+    const PythAggregatorV3Address = "0x5418Bd0bd3A43D6DcC486fb374a2346BE5e07A0D";
     let PythAggregatorV3;
 
     if (ethers.isAddress(PythAggregatorV3Address)) {
@@ -19,8 +19,8 @@ async function main() {
         );
     } else {
         PythAggregatorV3 = await upgrades.deployProxy(PythAggregatorV3Factory, [
-            PYTH_SOL_USD_PRICE_FEED_ID,
-            PYTH_SOL_USD_PRICE_FEED_ACCOUNT
+            PYTH_PRICE_FEED_ID,
+            PYTH_PRICE_FEED_ACCOUNT
         ], {kind: 'uups'});
         await PythAggregatorV3.waitForDeployment();
 
@@ -29,7 +29,7 @@ async function main() {
         );
     }
 
-    console.log('\n Listing data for Pyth SOL/ USDC price feed:');
+    console.log('\n Listing data for Pyth NEON/ USDC price feed:');
     console.log(await PythAggregatorV3.decimals(), 'decimals');
     console.log(await PythAggregatorV3.description(), 'description');
     console.log(await PythAggregatorV3.version(), 'version');
