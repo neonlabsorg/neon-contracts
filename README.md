@@ -1,1 +1,1 @@
-# Neon contracts
+# Neon EVM contracts
