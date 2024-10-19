@@ -73,13 +73,11 @@ contract SolanaVRF {
 
     /// @notice This method serves to read VRF data from Solana
     /// @param solanaAddress The Solana account address from where data will be readen
-    /// @param offset The offset in bytes ( starting to read from this byte )
-    /// @param len The length of the Solana data account ( stopping to read to this byte )
     /// @return Initiator
     /// @return Seed
     /// @return Randomness
-    function getRandomness(bytes32 solanaAddress, uint64 offset, uint64 len) public view returns(bytes32, bytes32, uint64) {
-        (bool success, bytes memory data) = QueryAccount.data(uint256(solanaAddress), offset, len);
+    function getRandomness(bytes32 solanaAddress) public view returns(bytes32, bytes32, uint64) {
+        (bool success, bytes memory data) = QueryAccount.data(uint256(solanaAddress), 0, 137); // 137 is the total bytes size of Randomness account
         require(success, "failed to query account data");
 
         return (
