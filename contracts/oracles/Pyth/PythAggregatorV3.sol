@@ -3,8 +3,8 @@ pragma solidity ^0.8.28;
 
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
-import "../utils/SolanaDataConverterLib.sol";
-import "../precompiles/QueryAccount.sol";
+import "../../utils/SolanaDataConverterLib.sol";
+import "../../precompiles/QueryAccount.sol";
 
 
 /// @author https://twitter.com/mnedelchev_
