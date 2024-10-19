@@ -9,7 +9,7 @@ const web3 = require('@solana/web3.js');
 
 async function main() {
     const SolanaVRFFactory = await ethers.getContractFactory("SolanaVRF");
-    const SolanaVRFAddress = "0x012aE45bA073958A37F3f7595adA016ae6c4B520";
+    const SolanaVRFAddress = "0xdbb9e8b20020F306465C7D116E8F192266c4Bc31";
     let SolanaVRF;
 
     if (ethers.isAddress(SolanaVRFAddress)) {
@@ -44,17 +44,15 @@ async function main() {
     async function getRandomness(seed) {
         console.log(
             await SolanaVRF.getRandomness(
-                await SolanaVRF.randomnessAccountAddress(seed),
-                0, // bytes offset
-                137 // bytes length
+                await SolanaVRF.randomnessAccountAddress(seed)
             ), 
             'getRandomness'
         );
     }
 
-    //requestRandomness();
+    requestRandomness();
 
-    getRandomness('0xef8563493e9630133b3f4a8383a0a292b87acf6f0b3a35d4f782447d6ecc3e0c'); // pass your seed here
+    //getRandomness(''); // pass your seed here
 }
 
 // We recommend this pattern to be able to use async/await everywhere
