@@ -1,12 +1,15 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.26;
+pragma solidity ^0.8.28;
 
-import "../utils/SolanaDataConverterLib.sol";
-import "../precompiles/QueryAccount.sol";
-import "../precompiles/ICallSolana.sol";
+import "../../utils/SolanaDataConverterLib.sol";
+import "../../precompiles/QueryAccount.sol";
+import "../../precompiles/ICallSolana.sol";
 
 
-contract TestReadPythPriceFeed {
+/// @title SolanaVRF
+/// @author https://twitter.com/mnedelchev_
+/// @notice This contract serves as an interface contract to ORAO’s verifiable random function on Solana.
+contract SolanaVRF {
     using SolanaDataConverterLib for bytes;
     using SolanaDataConverterLib for uint64;
 
@@ -16,12 +19,16 @@ contract TestReadPythPriceFeed {
     bytes32 public vrfTreasury = 0x7f2dcd2aa425a24abf0d8fe12b60aa8f4768370d0fd99c738aefe6f2150f03b8;
     bytes public vrfInstructionId = hex"2697d106c3661cd9";
 
+    /// @notice This method serves to request VRF randomness from Solana
+    /// @param seed Random generated seed in bytes32 format
+    /// @param lamports The SOL amount to be requested from the CALL_SOLANA's payer in order to create the Randomness Solana account
+    /// @custom:getter getRandomness
     function requestRandomness(
         bytes32 seed,
         uint64 lamports
     ) external {
         bytes memory accountsList = abi.encodePacked(
-            abi.encodePacked(CALL_SOLANA.getNeonAddress(address(this)), true, true),
+            abi.encodePacked(CALL_SOLANA.getPayer(), true, true),
             abi.encodePacked(vrfNetworkState, false, true),
             abi.encodePacked(vrfTreasury, false, true),
             abi.encodePacked(
@@ -36,7 +43,7 @@ contract TestReadPythPriceFeed {
             lamports,
             abi.encodePacked(
                 vrfProgramId, 
-                _reverseShift(accountsList.length),
+                _reverseShift(5), // accountsList length
                 accountsList,
                 _reverseShift(
                     abi.encodePacked(
@@ -50,7 +57,10 @@ contract TestReadPythPriceFeed {
         );
     }
 
-    // Calculates as PDA([Buffer.from("orao-vrf-randomness-request"), seed], vrf_id)
+
+    /// @notice This method serves to return the public key of Randomness Solana account
+    /// @dev Calculates as PDA([Buffer.from("orao-vrf-randomness-request"), seed], vrf_id)
+    /// @param seed Random generated seed in bytes32 format
     function randomnessAccountAddress(bytes32 seed) public view returns(bytes32) {
         return CALL_SOLANA.getSolanaPDA(
             vrfProgramId,
@@ -73,9 +83,9 @@ contract TestReadPythPriceFeed {
         require(success, "failed to query account data");
 
         return (
-            data.toBytes32(9),
-            data.toBytes32(41),
-            (data.toUint64(73)).readLittleEndianUnsigned64()
+            data.toBytes32(9), // VRF Initiator publicKey offset
+            data.toBytes32(41), // VRF Seed offset
+            (data.toUint64(73)).readLittleEndianUnsigned64() // VRF Randomness offset
         );
     }
 
@@ -94,7 +104,6 @@ contract TestReadPythPriceFeed {
         for (uint256 i = 0; i < numBytes; i++) {
             shiftedValue[i] = bytes1(uint8(value >> ((numBytes - 1 - i) * 8)));
         }
-
         return shiftedValue;
     }
 }

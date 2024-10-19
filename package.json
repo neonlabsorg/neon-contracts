@@ -30,5 +30,8 @@
     "ts-node": "^10.9.2",
     "typechain": "^8.3.2",
     "typescript": "^5.4.5"
+  },
+  "dependencies": {
+    "@solana/web3.js": "^1.95.4"
   }
 }
