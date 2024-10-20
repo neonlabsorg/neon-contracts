@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
+/// @title SolanaDataConverterLib
+/// @author https://twitter.com/mnedelchev_
+/// @notice This contract serves as a helper library when interacting with precompile QueryAccount ( 0xFF00000000000000000000000000000000000002 )
 library SolanaDataConverterLib {
     function toAddress(bytes memory _bytes, uint256 _start) internal pure returns (address) {
         require(_bytes.length >= _start + 20, "toAddress_outOfBounds");

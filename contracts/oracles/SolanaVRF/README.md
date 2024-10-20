@@ -6,7 +6,7 @@ The following smart contract is an interface to existing [VRF functionality](htt
 * `getRandomness` - this method is a getter and returns the VRF value once it's being fulfilled
 * `randomnessAccountAddress` - this method is a getter and returns the account where the fulfilled VRF value will be stored
 
-You can interact with this smart contract at [https://neonscan.org/address/0xdbb9e8b20020F306465C7D116E8F192266c4Bc31#contract](https://neonscan.org/address/0xdbb9e8b20020F306465C7D116E8F192266c4Bc31#contract).
+You can interact with this smart contract at [https://neonscan.org/address/0x317026f4584e7e2c3656dA848Edb971ceFAD0D6b#contract](https://neonscan.org/address/0x317026f4584e7e2c3656dA848Edb971ceFAD0D6b#contract).
 
 ### Off-chain subscription to fulfilled randomness
 ```

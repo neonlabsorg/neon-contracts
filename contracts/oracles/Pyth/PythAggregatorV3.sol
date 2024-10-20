@@ -10,9 +10,7 @@ import "../../precompiles/QueryAccount.sol";
 /// @author https://twitter.com/mnedelchev_
 /// @custom:oz-upgrades-unsafe-allow constructor
 contract PythAggregatorV3 is OwnableUpgradeable, UUPSUpgradeable {
-    using SolanaDataConverterLib for bytes;
-    using SolanaDataConverterLib for uint32;
-    using SolanaDataConverterLib for uint64;
+    using SolanaDataConverterLib for *;
 
     bytes32 public priceId;
     bytes32 public priceFeedSolanaAccount;
