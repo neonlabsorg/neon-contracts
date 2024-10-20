@@ -2,6 +2,7 @@
 pragma solidity ^0.8.28;
 
 import "../../utils/SolanaDataConverterLib.sol";
+import "../../utils/CallSolanaHelperLib.sol";
 import "../../precompiles/QueryAccount.sol";
 import "../../precompiles/ICallSolana.sol";
 
@@ -10,8 +11,7 @@ import "../../precompiles/ICallSolana.sol";
 /// @author https://twitter.com/mnedelchev_
 /// @notice This contract serves as an interface contract to ORAO’s verifiable random function on Solana.
 contract SolanaVRF {
-    using SolanaDataConverterLib for bytes;
-    using SolanaDataConverterLib for uint64;
+    using SolanaDataConverterLib for *;
 
     ICallSolana public constant CALL_SOLANA = ICallSolana(0xFF00000000000000000000000000000000000006);
     bytes32 public vrfProgramId = 0x0747b11afa91b4d1f922f27b0ebac1dab23b2129a4bef34f32a47b58f5cefc78;
@@ -27,32 +27,26 @@ contract SolanaVRF {
         bytes32 seed,
         uint64 lamports
     ) external {
-        bytes memory accountsList = abi.encodePacked(
-            abi.encodePacked(CALL_SOLANA.getPayer(), true, true),
-            abi.encodePacked(vrfNetworkState, false, true),
-            abi.encodePacked(vrfTreasury, false, true),
-            abi.encodePacked(
-                randomnessAccountAddress(seed), 
-                false, 
-                true
-            ),
-            abi.encodePacked(bytes32(0), false, false) // System program
+        bytes[] memory accounts = new bytes[](5);
+        accounts[0] = abi.encodePacked(CALL_SOLANA.getPayer(), true, true);
+        accounts[1] = abi.encodePacked(vrfNetworkState, false, true);
+        accounts[2] = abi.encodePacked(vrfTreasury, false, true);
+        accounts[3] = abi.encodePacked(
+            randomnessAccountAddress(seed), 
+            false, 
+            true
         );
+        accounts[4] = abi.encodePacked(bytes32(0), false, false); // System program
 
         CALL_SOLANA.execute(
             lamports,
-            abi.encodePacked(
-                vrfProgramId, 
-                _reverseShift(5), // accountsList length
-                accountsList,
-                _reverseShift(
-                    abi.encodePacked(
-                        vrfInstructionId,
-                        seed
-                    ).length
-                ),
-                vrfInstructionId,
-                seed
+            CallSolanaHelperLib.prepareSolanaInstruction(
+                vrfProgramId,
+                accounts,
+                abi.encodePacked(
+                    vrfInstructionId,
+                    seed
+                )
             )
         );
     }
@@ -85,23 +79,5 @@ contract SolanaVRF {
             data.toBytes32(41), // VRF Seed offset
             (data.toUint64(73)).readLittleEndianUnsigned64() // VRF Randomness offset
         );
-    }
-
-    function _reverseShift(uint256 value) internal pure returns (bytes memory) {
-        bytes memory shiftedValue = new bytes(8);
-
-        // Calculate the number of bytes that the input value occupies
-        uint256 tempValue = value;
-        uint256 numBytes = 0;
-        while (tempValue > 0) {
-            numBytes++;
-            tempValue >>= 8;
-        }
-
-        // Reverse and shift the bytes to the leftmost position
-        for (uint256 i = 0; i < numBytes; i++) {
-            shiftedValue[i] = bytes1(uint8(value >> ((numBytes - 1 - i) * 8)));
-        }
-        return shiftedValue;
     }
 }
