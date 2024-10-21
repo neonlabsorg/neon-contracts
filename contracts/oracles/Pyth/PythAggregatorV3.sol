@@ -6,7 +6,8 @@ import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "../../utils/SolanaDataConverterLib.sol";
 import "../../precompiles/QueryAccount.sol";
 
-
+/// @title An instance of the ChainlinkAggregatorV3 interface that supports Pyth price feeds from Solana
+/// @notice This does not store any roundId information on-chain. Please review the code before using this implementation. Users should deploy an instance of this contract to wrap every price feed id that they need to use.
 /// @author https://twitter.com/mnedelchev_
 /// @custom:oz-upgrades-unsafe-allow constructor
 contract PythAggregatorV3 is OwnableUpgradeable, UUPSUpgradeable {
@@ -52,7 +53,7 @@ contract PythAggregatorV3 is OwnableUpgradeable, UUPSUpgradeable {
     }
 
     function description() public pure returns (string memory) {
-        return "A port of a chainlink aggregator powered by pyth network feeds";
+        return "An instance of the ChainlinkAggregatorV3 interface that supports Pyth price feeds from Solana";
     }
 
     function version() public pure returns (uint256) {
