@@ -22,7 +22,7 @@ contract SolanaVRF {
     /// @notice The Randomness account on Solana is invalid.
     error InvalidRandomnessAccount();
 
-    /// @notice The Randomness account on Solana is invalid.
+    /// @notice The Randomness account on Solana is created, but still not fulfilled.
     error InvalidRandomnessValue();
 
     /// @notice This method serves to request VRF randomness from Solana
