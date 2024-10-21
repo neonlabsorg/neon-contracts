@@ -19,6 +19,12 @@ contract SolanaVRF {
     bytes32 public vrfTreasury = 0x7f2dcd2aa425a24abf0d8fe12b60aa8f4768370d0fd99c738aefe6f2150f03b8;
     bytes public vrfInstructionId = hex"2697d106c3661cd9";
 
+    /// @notice The Randomness account on Solana is invalid.
+    error InvalidRandomnessAccount();
+
+    /// @notice The Randomness account on Solana is invalid.
+    error InvalidRandomnessValue();
+
     /// @notice This method serves to request VRF randomness from Solana
     /// @param seed Random generated seed in bytes32 format
     /// @param lamports The SOL amount to be requested from the CALL_SOLANA's payer in order to create the Randomness Solana account
@@ -66,13 +72,14 @@ contract SolanaVRF {
     }
 
     /// @notice This method serves to read VRF data from Solana
-    /// @param solanaAddress The Solana account address from where data will be readen
+    /// @param seed The seed you've previously passed at method requestRandomness
     /// @return Initiator
     /// @return Seed
     /// @return Randomness
-    function getRandomness(bytes32 solanaAddress) public view returns(bytes32, bytes32, uint64) {
-        (bool success, bytes memory data) = QueryAccount.data(uint256(solanaAddress), 0, 137); // 137 is the total bytes size of Randomness account
-        require(success, "failed to query account data");
+    function getRandomness(bytes32 seed) public view returns(bytes32, bytes32, uint64) {
+        (bool success, bytes memory data) = QueryAccount.data(uint256(randomnessAccountAddress(seed)), 0, 137); // 137 is the total bytes size of Randomness account
+        require(success, InvalidRandomnessAccount());
+        require((data.toUint64(73)).readLittleEndianUnsigned64() > 0, InvalidRandomnessValue());
 
         return (
             data.toBytes32(9), // VRF Initiator publicKey offset

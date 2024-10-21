@@ -36,6 +36,7 @@ library CallSolanaValidationLib {
 
         // validate instructionId
         require(
+            // comparing with offset 8 bytes, because the first 8 bytes of passed instruction data is the instruction data length ( bincode serialization )
             keccak256(abi.encodePacked(instruction[8:8+instructionIdParam.length])) == keccak256(abi.encodePacked(instructionIdParam)),
             InvalidInstruction()
         );
