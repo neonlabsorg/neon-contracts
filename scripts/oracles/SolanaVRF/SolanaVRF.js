@@ -9,7 +9,7 @@ const web3 = require('@solana/web3.js');
 
 async function main() {
     const SolanaVRFFactory = await ethers.getContractFactory("SolanaVRF");
-    const SolanaVRFAddress = "0x317026f4584e7e2c3656dA848Edb971ceFAD0D6b";
+    const SolanaVRFAddress = "0x426823A264914Baca0ed5Fec7940F86a457828eB";
     let SolanaVRF;
 
     if (ethers.isAddress(SolanaVRFAddress)) {
@@ -43,9 +43,7 @@ async function main() {
 
     async function getRandomness(seed) {
         console.log(
-            await SolanaVRF.getRandomness(
-                await SolanaVRF.randomnessAccountAddress(seed)
-            ), 
+            await SolanaVRF.getRandomness(seed), 
             'getRandomness'
         );
     }
