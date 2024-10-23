@@ -7,29 +7,58 @@ pragma solidity ^0.8.28;
 library CallSolanaHelperLib {
     /// @notice This method prepares Solana's instruction data into bincode serialized format
     /// @param programId The programId of the instruction
-    /// @param accounts The instruction accounts list, e.g. abi.encodePacked(0x123, true, true). The Solana account is in bytes32 format
+    /// @param accounts The instruction accounts list in bytes32 format
+    /// @param isSigner List of bool format containing info if the particular account is signer
+    /// @param isWritable List of bool format containing info if the particular account is writable
     /// @param instructionData The instruction data
     function prepareSolanaInstruction(
         bytes32 programId,
-        bytes[] memory accounts,
+        bytes32[] memory accounts,
+        bool[] memory isSigner,
+        bool[] memory isWritable,
         bytes memory instructionData
     ) internal pure returns (bytes memory) {
-        uint accountsLen = accounts.length;
-        bytes memory accountsList;
-        for (uint i = 0; i < accountsLen; ++i) {
-            accountsList = abi.encodePacked(
-                accountsList, 
-                accounts[i]
-            );
+        bytes memory programIdAndAccounts;
+        assembly {
+            // define the accounts length
+            let accountsLen := mload(accounts)
+            
+            // Get the free memory pointer
+            programIdAndAccounts := mload(0x40) // Load the current free memory pointer
+            
+            let dataLength := add(8, add(8, mul(accountsLen, 34)))
+            // Set the new free memory pointer to accommodate the new bytes variable
+            mstore(0x40, add(programIdAndAccounts, add(dataLength, 0x20))) // Update free memory pointer
+
+            // Store the length of the bytes array at the beginning
+            mstore(programIdAndAccounts, dataLength)
+
+            let dataPtr := add(programIdAndAccounts, 0x20)
+
+            // add accounts length
+            mstore8(dataPtr, accountsLen)
+            dataPtr := add(dataPtr, 8)
+            
+            // add accounts
+            for { 
+                let i := 0 // Initialize the loop variable
+            } lt(i, accountsLen) { 
+                i := add(i, 1) // Increment the loop variable
+            } {
+                mstore(dataPtr, mload(add(accounts, add(0x20, mul(i, 0x20)))))
+                mstore8(add(dataPtr, 32), mload(add(isSigner, add(0x20, mul(i, 0x20)))))
+                mstore8(add(dataPtr, 33), mload(add(isWritable, add(0x20, mul(i, 0x20)))))
+                dataPtr := add(dataPtr, 34)
+            }
+
+            // add instruction data length
+            mstore8(dataPtr, mload(instructionData))
+            dataPtr := add(dataPtr, 8) 
         }
 
         return abi.encodePacked(
-            programId, 
-            _reverseShift(accountsLen),
-            accountsList,
-            _reverseShift(
-                instructionData.length
-            ),
+            programId,
+            programIdAndAccounts,
             instructionData
         );
     }
