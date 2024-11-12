@@ -20,7 +20,7 @@ library CallSolanaHelperLib {
     ) internal pure returns (bytes memory) {
         bytes memory programIdAndAccounts;
         assembly {
-            // Get the free memory pointer
+            // get the free memory pointer
             programIdAndAccounts := mload(0x40)
 
             // define the accounts length
@@ -29,6 +29,7 @@ library CallSolanaHelperLib {
             // define the instructionData length
             let instructionDataLen := mload(instructionData)
             
+            // define the total output bytes length
             let dataLength := add(instructionDataLen, add(32, add(8, add(8, mul(accountsLen, 34)))))
 
             // set the new free memory pointer to accommodate the new bytes variable
@@ -48,11 +49,7 @@ library CallSolanaHelperLib {
             dataPtr := add(dataPtr, 8)
             
             // loop store accounts + isSigner + isWritable
-            for { 
-                let i := 0 // Initialize the loop variable
-            } lt(i, accountsLen) { 
-                i := add(i, 1) // Increment the loop variable
-            } {
+            for { let i := 0 } lt(i, accountsLen) { i := add(i, 1) } {
                 mstore(dataPtr, mload(add(accounts, add(0x20, mul(i, 0x20)))))
                 mstore8(add(dataPtr, 32), mload(add(isSigner, add(0x20, mul(i, 0x20)))))
                 mstore8(add(dataPtr, 33), mload(add(isWritable, add(0x20, mul(i, 0x20)))))
