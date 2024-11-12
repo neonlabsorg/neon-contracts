@@ -7,7 +7,7 @@ pragma solidity ^0.8.28;
 library CallSolanaHelperLib {
     /// @notice This method prepares Solana's instruction data into bincode serialized format
     /// @param programId The programId of the instruction
-    /// @param accounts The instruction accounts list in bytes32 format
+    /// @param accounts List of instruction accounts in bytes32 format
     /// @param isSigner List of bool format containing info if the particular account is signer
     /// @param isWritable List of bool format containing info if the particular account is writable
     /// @param instructionData The instruction data
@@ -20,26 +20,34 @@ library CallSolanaHelperLib {
     ) internal pure returns (bytes memory) {
         bytes memory programIdAndAccounts;
         assembly {
+            // Get the free memory pointer
+            programIdAndAccounts := mload(0x40)
+
             // define the accounts length
             let accountsLen := mload(accounts)
-            
-            // Get the free memory pointer
-            programIdAndAccounts := mload(0x40) // Load the current free memory pointer
-            
-            let dataLength := add(8, add(8, mul(accountsLen, 34)))
-            // Set the new free memory pointer to accommodate the new bytes variable
-            mstore(0x40, add(programIdAndAccounts, add(dataLength, 0x20))) // Update free memory pointer
 
-            // Store the length of the bytes array at the beginning
+            // define the instructionData length
+            let instructionDataLen := mload(instructionData)
+            
+            let dataLength := add(instructionDataLen, add(32, add(8, add(8, mul(accountsLen, 34)))))
+
+            // set the new free memory pointer to accommodate the new bytes variable
+            mstore(0x40, add(programIdAndAccounts, add(dataLength, 0x20)))
+
+            // store dataLength ( the total output bytes length )
             mstore(programIdAndAccounts, dataLength)
 
             let dataPtr := add(programIdAndAccounts, 0x20)
 
-            // add accounts length
+            // store programId
+            mstore(dataPtr, programId)
+            dataPtr := add(dataPtr, 32)
+
+            // store accountsLen
             mstore8(dataPtr, accountsLen)
             dataPtr := add(dataPtr, 8)
             
-            // add accounts
+            // loop store accounts + isSigner + isWritable
             for { 
                 let i := 0 // Initialize the loop variable
             } lt(i, accountsLen) { 
@@ -51,24 +59,27 @@ library CallSolanaHelperLib {
                 dataPtr := add(dataPtr, 34)
             }
 
-            // add instruction data length
-            mstore8(dataPtr, mload(instructionData))
-            dataPtr := add(dataPtr, 8) 
-        }
+            // store instructionDataLen
+            mstore8(dataPtr, instructionDataLen)
+            dataPtr := add(dataPtr, 8)
 
-        return abi.encodePacked(
-            programId,
-            programIdAndAccounts,
-            instructionData
-        );
+            // loop store instructionData
+            for { let i := 0 } lt(i, instructionDataLen) { i := add(i, 0x20) } {
+                mstore(dataPtr, mload(add(instructionData, add(0x20, mul(i, 0x20)))))
+            }
+        }
+        return programIdAndAccounts;
     }
 
-    /// @notice Converts address type into bytes32.
+    /// @notice Converts address type into bytes32
+    /// @param account EVM address of EOA or smart contract
     function addressToBytes32(address account) internal pure returns (bytes32) {
         return bytes32(uint256(uint160(account)));
     }
 
-    /// @notice Returns the Neon EVM's program arbitrary token account seeds for given EVM wallet.
+    /// @notice Returns the Neon EVM's program arbitrary token account seeds for given EVM wallet
+    /// @param token EVM address of ERC20ForSPL token
+    /// @param owner EVM address of EOA or smart contract
     function getArbitraryTokenAccountSeeds(address token, address owner) internal pure returns (bytes memory) {
         return abi.encodePacked(
             hex"03",
@@ -79,6 +90,9 @@ library CallSolanaHelperLib {
     }
 
     /// @notice Returns a Solana ATA account seeds.
+    /// @param owner SVM address of EOA or smart contract in bytes32 format
+    /// @param programId SVM address of a program on Solana
+    /// @param mint SVM address of SPLToken
     function getAssociateTokenAccountSeeds(bytes32 owner, bytes32 programId, bytes32 mint) internal pure returns (bytes memory) {
         return abi.encodePacked(
             owner,
@@ -94,12 +108,12 @@ library CallSolanaHelperLib {
         uint256 tempValue = value;
         uint256 numBytes = 0;
         while (tempValue > 0) {
-            numBytes++;
+            ++numBytes;
             tempValue >>= 8;
         }
 
         // Reverse and shift the bytes to the leftmost position
-        for (uint256 i = 0; i < numBytes; i++) {
+        for (uint256 i = 0; i < numBytes; ++i) {
             shiftedValue[i] = bytes1(uint8(value >> ((numBytes - 1 - i) * 8)));
         }
         return shiftedValue;
