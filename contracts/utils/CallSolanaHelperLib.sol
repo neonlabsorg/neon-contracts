@@ -100,22 +100,4 @@ library CallSolanaHelperLib {
             mint
         );
     }
-
-    function _reverseShift(uint256 value) internal pure returns (bytes memory) {
-        bytes memory shiftedValue = new bytes(8);
-
-        // Calculate the number of bytes that the input value occupies
-        uint256 tempValue = value;
-        uint256 numBytes = 0;
-        while (tempValue > 0) {
-            ++numBytes;
-            tempValue >>= 8;
-        }
-
-        // Reverse and shift the bytes to the leftmost position
-        for (uint256 i = 0; i < numBytes; ++i) {
-            shiftedValue[i] = bytes1(uint8(value >> ((numBytes - 1 - i) * 8)));
-        }
-        return shiftedValue;
-    }
 }
