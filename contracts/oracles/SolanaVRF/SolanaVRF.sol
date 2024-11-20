@@ -33,22 +33,34 @@ contract SolanaVRF {
         bytes32 seed,
         uint64 lamports
     ) external {
-        bytes[] memory accounts = new bytes[](5);
-        accounts[0] = abi.encodePacked(CALL_SOLANA.getPayer(), true, true);
-        accounts[1] = abi.encodePacked(vrfNetworkState, false, true);
-        accounts[2] = abi.encodePacked(vrfTreasury, false, true);
-        accounts[3] = abi.encodePacked(
-            randomnessAccountAddress(seed), 
-            false, 
-            true
-        );
-        accounts[4] = abi.encodePacked(bytes32(0), false, false); // System program
+        bytes32[] memory accounts = new bytes32[](5);
+        accounts[0] = CALL_SOLANA.getPayer();
+        accounts[1] = vrfNetworkState;
+        accounts[2] = vrfTreasury;
+        accounts[3] = randomnessAccountAddress(seed);
+        accounts[4] = bytes32(0); // System program
+
+        bool[] memory isSigner = new bool[](5);
+        isSigner[0] = true;
+        isSigner[1] = false;
+        isSigner[2] = false;
+        isSigner[3] = false;
+        isSigner[4] = false;
+
+        bool[] memory isWritable = new bool[](5);
+        isWritable[0] = true;
+        isWritable[1] = true;
+        isWritable[2] = true;
+        isWritable[3] = true;
+        isWritable[4] = false;
 
         CALL_SOLANA.execute(
             lamports,
             CallSolanaHelperLib.prepareSolanaInstruction(
                 vrfProgramId,
                 accounts,
+                isSigner,
+                isWritable,
                 abi.encodePacked(
                     vrfInstructionId,
                     seed
@@ -56,7 +68,6 @@ contract SolanaVRF {
             )
         );
     }
-
 
     /// @notice This method serves to return the public key of Randomness Solana account
     /// @dev Calculates as PDA([Buffer.from("orao-vrf-randomness-request"), seed], vrf_id)
@@ -79,12 +90,14 @@ contract SolanaVRF {
     function getRandomness(bytes32 seed) public view returns(bytes32, bytes32, uint64) {
         (bool success, bytes memory data) = QueryAccount.data(uint256(randomnessAccountAddress(seed)), 0, 137); // 137 is the total bytes size of Randomness account
         require(success, InvalidRandomnessAccount());
-        require((data.toUint64(73)).readLittleEndianUnsigned64() > 0, InvalidRandomnessValue());
+
+        uint64 vrfValue = (data.toUint64(73)).readLittleEndianUnsigned64();
+        require(vrfValue > 0, InvalidRandomnessValue());
 
         return (
             data.toBytes32(9), // VRF Initiator publicKey offset
             data.toBytes32(41), // VRF Seed offset
-            (data.toUint64(73)).readLittleEndianUnsigned64() // VRF Randomness offset
+            vrfValue // VRF Randomness value offset
         );
     }
 }
