@@ -7,10 +7,10 @@
 const { ethers } = require("hardhat");
 
 async function main() {
-    const PYTH_PRICE_FEED_ID = '0xd82183dd487bef3208a227bb25d748930db58862c5121198e723ed0976eb92b7';
-    const PYTH_PRICE_FEED_ACCOUNT = '0xd0659a310e813dd255d09668f02808dfc34d20b3c89d001758a38dee5af54fa8'; // F2VfCymdNQiCa8Vyg5E7BwEv9UPwfm8cVN6eqQLqXiGo
+    const PYTH_PRICE_FEED_ID = "";
+    const PYTH_PRICE_FEED_ACCOUNT = "";
     const PythAggregatorV3Factory = await ethers.getContractFactory("PythAggregatorV3");
-    const PythAggregatorV3Address = "0x5418Bd0bd3A43D6DcC486fb374a2346BE5e07A0D";
+    const PythAggregatorV3Address = "";
     let PythAggregatorV3;
 
     if (ethers.isAddress(PythAggregatorV3Address)) {
@@ -29,7 +29,7 @@ async function main() {
         );
     }
 
-    console.log('\n Listing data for Pyth NEON/ USDC price feed:');
+    console.log('\n Listing data for Pyth price feed:');
     console.log(await PythAggregatorV3.decimals(), 'decimals');
     console.log(await PythAggregatorV3.description(), 'description');
     console.log(await PythAggregatorV3.version(), 'version');
