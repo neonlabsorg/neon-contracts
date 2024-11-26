@@ -7,8 +7,8 @@
 const { ethers } = require("hardhat");
 
 async function main() {
-    const PYTH_PRICE_FEED_ID = "";
-    const PYTH_PRICE_FEED_ACCOUNT = "";
+    const PYTH_PRICE_FEED_ID = ""; // bytes32
+    const PYTH_PRICE_FEED_ACCOUNT = ""; // bytes32
     const PythAggregatorV3Factory = await ethers.getContractFactory("PythAggregatorV3");
     const PythAggregatorV3Address = "";
     let PythAggregatorV3;
