@@ -62,7 +62,7 @@ library CallSolanaHelperLib {
 
             // loop store instructionData
             for { let i := 0 } lt(i, instructionDataLen) { i := add(i, 0x20) } {
-                mstore(dataPtr, mload(add(instructionData, add(0x20, mul(i, 0x20)))))
+                mstore(add(dataPtr, i), mload(add(instructionData, add(0x20, i))))
             }
         }
         return programIdAndAccounts;
