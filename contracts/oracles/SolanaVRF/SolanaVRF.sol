@@ -6,7 +6,6 @@ import "../../utils/CallSolanaHelperLib.sol";
 import "../../precompiles/QueryAccount.sol";
 import "../../precompiles/ICallSolana.sol";
 
-
 /// @title SolanaVRF
 /// @author https://twitter.com/mnedelchev_
 /// @notice This contract serves as an interface contract to ORAO’s verifiable random function on Solana.
@@ -18,6 +17,10 @@ contract SolanaVRF {
     bytes32 public vrfNetworkState = 0x3ede735db98b5ca2accac3bc1269e54b5409e5ea2c2bf6b2be0d80db10ee8f8c;
     bytes32 public vrfTreasury = 0x7f2dcd2aa425a24abf0d8fe12b60aa8f4768370d0fd99c738aefe6f2150f03b8;
     bytes public vrfInstructionId = hex"2697d106c3661cd9";
+    uint64 public fulfilledAccountLength = 137;
+
+    /// @notice The Randomness account on Solana is not fulfilled yet.
+    error RandomnessAccountNotFulfilled();
 
     /// @notice The Randomness account on Solana is invalid.
     error InvalidRandomnessAccount();
@@ -88,7 +91,11 @@ contract SolanaVRF {
     /// @return Seed
     /// @return Randomness
     function getRandomness(bytes32 seed) public view returns(bytes32, bytes32, uint64) {
-        (bool success, bytes memory data) = QueryAccount.data(uint256(randomnessAccountAddress(seed)), 0, 137); // 137 is the total bytes size of Randomness account
+        (bool success, uint256 length) = QueryAccount.length(uint256(randomnessAccountAddress(seed)));
+        require(success && length == fulfilledAccountLength, RandomnessAccountNotFulfilled());
+
+        bytes memory data;
+        (success, data) = QueryAccount.data(uint256(randomnessAccountAddress(seed)), 0, fulfilledAccountLength);
         require(success, InvalidRandomnessAccount());
 
         uint64 vrfValue = (data.toUint64(73)).readLittleEndianUnsigned64();
@@ -97,7 +104,7 @@ contract SolanaVRF {
         return (
             data.toBytes32(9), // VRF Initiator publicKey offset
             data.toBytes32(41), // VRF Seed offset
-            vrfValue // VRF Randomness value offset
+            vrfValue // VRF Randomness value
         );
     }
 }
