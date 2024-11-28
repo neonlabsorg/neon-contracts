@@ -9,7 +9,7 @@ const web3 = require('@solana/web3.js');
 
 async function main() {
     const SolanaVRFFactory = await ethers.getContractFactory("SolanaVRF");
-    let SolanaVRFAddress = "0xdb8bf58547C3D5eeC7cE0E59f95e60ee710D3884";
+    let SolanaVRFAddress = "0xB2a53974AfeC44E08805dDe138dAc7935753E60F";
     let SolanaVRF;
 
     if (ethers.isAddress(SolanaVRFAddress)) {
