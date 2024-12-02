@@ -8,7 +8,7 @@ const { ethers } = require("hardhat");
 
 async function main() {
     const PYTH_PRICE_FEED_ID = ""; // bytes32
-    const PYTH_PRICE_FEED_ACCOUNT = ""; // bytes32
+    const PYTH_PRICE_FEED_ACCOUNT = ""; // Solana account public key
     const PythAggregatorV3Factory = await ethers.getContractFactory("PythAggregatorV3");
     const PythAggregatorV3Address = "";
     let PythAggregatorV3;
@@ -19,8 +19,8 @@ async function main() {
         );
     } else {
         PythAggregatorV3 = await upgrades.deployProxy(PythAggregatorV3Factory, [
-            PYTH_PRICE_FEED_ID,
-            PYTH_PRICE_FEED_ACCOUNT
+            '0x' + PYTH_PRICE_FEED_ID,
+            ethers.zeroPadValue(ethers.toBeHex(ethers.decodeBase58(PYTH_PRICE_FEED_ACCOUNT)), 32)
         ], {kind: 'uups'});
         await PythAggregatorV3.waitForDeployment();
 
