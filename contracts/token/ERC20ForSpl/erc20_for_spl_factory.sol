@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity >=0.5.12;
 
-import './ERC20ForSPL.sol';
+import './erc20_for_spl.sol';
 
 contract ERC20ForSplFactory {
 

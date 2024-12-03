@@ -6,7 +6,7 @@ interface IMetaplex {
     function createMetadata(bytes32 _mint, string memory _name, string memory _symbol, string memory _uri) external returns(bytes32);
     
     /// @notice Creates Master Edition account on Solana
-    /// @dev  Decimals of the token has to be 0
+    /// @dev Decimals of the token has to be 0
     function createMasterEdition(bytes32 mint, uint64 maxSupply) external returns(bytes32);
 
     /// @notice Check if SPLToken has been minted
