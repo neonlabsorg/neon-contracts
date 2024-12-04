@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-interface IMetaplex {
+interface IMetaplexProgram {
     /// @notice Pass SPLToken metadata to Metaplex
     function createMetadata(bytes32 _mint, string memory _name, string memory _symbol, string memory _uri) external returns(bytes32);
     

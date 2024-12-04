@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import {ISPLToken} from "../../precompiles/ISPLToken.sol";
-import {IMetaplex} from "../../precompiles/IMetaplex.sol";
+import {ISPLTokenProgram} from "../../precompiles/ISPLTokenProgram.sol";
+import {IMetaplexProgram} from "../../precompiles/IMetaplexProgram.sol";
 import {ICallSolana} from "../../precompiles/ICallSolana.sol";
 import {ISolanaNative} from "../../precompiles/ISolanaNative.sol";
 import {QueryAccount} from "../../precompiles/QueryAccount.sol";
@@ -15,8 +15,8 @@ import {SolanaDataConverterLib} from "../../utils/SolanaDataConverterLib.sol";
 contract ERC20ForSPLBackbone {
     using SolanaDataConverterLib for *;
 
-    ISPLToken constant SPLToken = ISPLToken(0xFf00000000000000000000000000000000000004);
-    IMetaplex constant Metaplex = IMetaplex(0xff00000000000000000000000000000000000005);
+    ISPLTokenProgram constant SPLTokenProgram = ISPLTokenProgram(0xFf00000000000000000000000000000000000004);
+    IMetaplexProgram constant MetaplexProgram = IMetaplexProgram(0xff00000000000000000000000000000000000005);
     ICallSolana public constant CALL_SOLANA = ICallSolana(0xFF00000000000000000000000000000000000006);
     ISolanaNative constant SolanaNative = ISolanaNative(0xfF00000000000000000000000000000000000007);
     bytes32 public constant TOKEN_PROGRAM = 0x06ddf6e1d765a193d9cbe146ceeb79ac1cb485ed5f5b37913a8cf5857eff00a9;
@@ -48,33 +48,33 @@ contract ERC20ForSPLBackbone {
 
     /// @notice Returns the name of the SPLToken. The name value is stored in the Metaplex protocol.
     function name() public view returns (string memory) {
-        return Metaplex.name(tokenMint);
+        return MetaplexProgram.name(tokenMint);
     }
 
     /// @notice Returns the symbol of the SPLToken. The symbol value is stored in the Metaplex protocol.
     function symbol() public view returns (string memory) {
-        return Metaplex.symbol(tokenMint);
+        return MetaplexProgram.symbol(tokenMint);
     }
 
     /// @notice Returns the decimals of the SPLToken.
     function decimals() public view returns (uint8) {
-        return SPLToken.getMint(tokenMint).decimals;
+        return SPLTokenProgram.getMint(tokenMint).decimals;
     }
 
     /// @notice Returns the totalSupply of the SPLToken.
     function totalSupply() public view returns (uint256) {
-        return SPLToken.getMint(tokenMint).supply;
+        return SPLTokenProgram.getMint(tokenMint).supply;
     }
 
     /// @notice Returns the SPLToken balance of an address.
     /// @dev Unlike typical ERC20 the balances of ERC20ForSPL are actually stored on Solana, this standard doesn't include balances mapping. There is condition to check if the account is a Neon EVM user or Solana user - if the user is from Solana then his ATA balance is also included into the total balance calculation.
     function balanceOf(address account) public view returns (uint256) {
-        uint balance = SPLToken.getAccount(solanaAccount(account)).amount;
+        uint balance = SPLTokenProgram.getAccount(solanaAccount(account)).amount;
         bytes32 solanaAddress = SolanaNative.solanaAddress(account);
 
         if (solanaAddress != bytes32(0)) {
             bytes32 tokenMintATA = getTokenMintATA(solanaAddress);
-            if (!SPLToken.isSystemAccount(tokenMintATA)) {
+            if (!SPLTokenProgram.isSystemAccount(tokenMintATA)) {
                 (bool success, bytes memory data) = QueryAccount.data(uint256(tokenMintATA), 0, 165);
                 require(success, FailedQueryAccountRequest(tokenMintATA));
                 uint64 tokenMintATABalance = (data.toUint64(64)).readLittleEndianUnsigned64();
@@ -138,9 +138,9 @@ contract ERC20ForSPLBackbone {
     function approveSolana(bytes32 spender, uint64 amount) public returns (bool) {
         bytes32 fromSolana = solanaAccount(msg.sender);
         if (amount > 0) {
-            SPLToken.approve(fromSolana, spender, amount);
+            SPLTokenProgram.approve(fromSolana, spender, amount);
         } else {
-            SPLToken.revoke(fromSolana);
+            SPLTokenProgram.revoke(fromSolana);
         }
 
         emit Approval(msg.sender, address(0), amount);
@@ -154,7 +154,7 @@ contract ERC20ForSPLBackbone {
     /// @param amount The amount to be transfered to the receiver
     /// @custom:getter balanceOf
     function transferSolana(bytes32 to, uint64 amount) public returns (bool) {
-        SPLToken.transfer(solanaAccount(msg.sender), to, uint64(amount));
+        SPLTokenProgram.transfer(solanaAccount(msg.sender), to, uint64(amount));
 
         emit Transfer(msg.sender, address(0), amount);
         emit TransferSolana(msg.sender, to, amount);
@@ -177,11 +177,11 @@ contract ERC20ForSPLBackbone {
     function claimTo(bytes32 from, address to, uint64 amount) public returns (bool) {
         bytes32 toSolana = solanaAccount(to);
 
-        if (SPLToken.isSystemAccount(toSolana)) {
-            SPLToken.initializeAccount(_salt(to), tokenMint);
+        if (SPLTokenProgram.isSystemAccount(toSolana)) {
+            SPLTokenProgram.initializeAccount(_salt(to), tokenMint);
         }
 
-        SPLToken.transferWithSeed(_salt(msg.sender), from, toSolana, amount);
+        SPLTokenProgram.transferWithSeed(_salt(msg.sender), from, toSolana, amount);
         emit Transfer(address(0), to, amount);
         return true;
     }
@@ -210,8 +210,8 @@ contract ERC20ForSPLBackbone {
         if (amount > type(uint64).max) revert AmountExceedsUint64();
 
         bytes32 fromSolana = solanaAccount(from);
-        if (SPLToken.getAccount(fromSolana).amount < amount) revert AmountExceedsBalance();
-        SPLToken.burn(tokenMint, fromSolana, uint64(amount));
+        if (SPLTokenProgram.getAccount(fromSolana).amount < amount) revert AmountExceedsBalance();
+        SPLTokenProgram.burn(tokenMint, fromSolana, uint64(amount));
 
         emit Transfer(from, address(0), amount);
     }
@@ -224,7 +224,7 @@ contract ERC20ForSPLBackbone {
         bytes32 fromSolanaAccount = SolanaNative.solanaAddress(from);
         if (fromSolanaAccount != bytes32(0)) {
             bytes32 fromTokenMintATA = getTokenMintATA(fromSolanaAccount);
-            if (!SPLToken.isSystemAccount(fromTokenMintATA)) {
+            if (!SPLTokenProgram.isSystemAccount(fromTokenMintATA)) {
                 fromSolana = fromTokenMintATA;
             } else {
                 fromSolana = solanaAccount(from);
@@ -237,7 +237,7 @@ contract ERC20ForSPLBackbone {
         bytes32 toSolanaAccount = SolanaNative.solanaAddress(to);
         if (toSolanaAccount != bytes32(0)) {
             bytes32 toTokenMintATA = getTokenMintATA(toSolanaAccount);
-            if (!SPLToken.isSystemAccount(toTokenMintATA)) {
+            if (!SPLTokenProgram.isSystemAccount(toTokenMintATA)) {
                 toSolana = toTokenMintATA;
             } else {
                 toSolana = solanaAccount(to);
@@ -246,27 +246,27 @@ contract ERC20ForSPLBackbone {
             toSolana = solanaAccount(to);
         }
 
-        if (SPLToken.isSystemAccount(toSolana)) {
-            SPLToken.initializeAccount(_salt(to), tokenMint);
+        if (SPLTokenProgram.isSystemAccount(toSolana)) {
+            SPLTokenProgram.initializeAccount(_salt(to), tokenMint);
         }
 
         if (amount > type(uint64).max) revert AmountExceedsUint64();
-        if (SPLToken.getAccount(fromSolana).amount < amount) revert AmountExceedsBalance();
+        if (SPLTokenProgram.getAccount(fromSolana).amount < amount) revert AmountExceedsBalance();
 
-        SPLToken.transfer(fromSolana, toSolana, uint64(amount));
+        SPLTokenProgram.transfer(fromSolana, toSolana, uint64(amount));
         emit Transfer(from, to, amount);
     }
 
     /// @notice Returns the Solana-like address which is binded to the Ethereum-like address.
     /// @dev When an address interacts for the first time with ERC20ForSPL under the hood there is Solana account creation which is binded to the Ethereum-like address used on Neon chain.
     function solanaAccount(address account) public pure returns (bytes32) {
-        return SPLToken.findAccount(_salt(account));
+        return SPLTokenProgram.findAccount(_salt(account));
     }
 
     /// @notice Returns the allowances made to Solana-like addresses.
     /// @dev Solana's architecture is a bit different compared to Ethereum and we can actually have only 1 delegate account at a time. Every new approval overwrites the previous one.
     function getAccountDelegateData(address account) public view returns(bytes32, uint64) {
-        ISPLToken.Account memory tokenAccount = SPLToken.getAccount(solanaAccount(account));
+        ISPLTokenProgram.Account memory tokenAccount = SPLTokenProgram.getAccount(solanaAccount(account));
         return (tokenAccount.delegate, tokenAccount.delegated_amount);
     }
 
@@ -297,8 +297,8 @@ contract ERC20ForSPLBackbone {
 contract ERC20ForSpl is ERC20ForSPLBackbone {
     /// @param _tokenMint The Solana-like address of the Token Mint on Solana
     constructor(bytes32 _tokenMint) {
-        if (!SPLToken.getMint(_tokenMint).isInitialized) revert InvalidTokenMint();
-        if (!Metaplex.isInitialized(_tokenMint)) revert MissingMetaplex();
+        if (!SPLTokenProgram.getMint(_tokenMint).isInitialized) revert InvalidTokenMint();
+        if (!MetaplexProgram.isInitialized(_tokenMint)) revert MissingMetaplex();
 
         tokenMint = _tokenMint;
     }
@@ -323,11 +323,11 @@ contract ERC20ForSplMintable is ERC20ForSPLBackbone {
     ) {
         _admin = _owner;
 
-        tokenMint = SPLToken.initializeMint(bytes32(0), _decimals);
-        if (!SPLToken.getMint(tokenMint).isInitialized) revert InvalidTokenMint();
+        tokenMint = SPLTokenProgram.initializeMint(bytes32(0), _decimals);
+        if (!SPLTokenProgram.getMint(tokenMint).isInitialized) revert InvalidTokenMint();
 
-        Metaplex.createMetadata(tokenMint, _name, _symbol, "");
-        if (!Metaplex.isInitialized(tokenMint)) revert MissingMetaplex();
+        MetaplexProgram.createMetadata(tokenMint, _name, _symbol, "");
+        if (!MetaplexProgram.isInitialized(tokenMint)) revert MissingMetaplex();
     }
 
     /// @notice Unauthorized msg.sender.
@@ -335,7 +335,7 @@ contract ERC20ForSplMintable is ERC20ForSPLBackbone {
 
     /// @notice Returns the Solana address of the Token Mint
     function findMintAccount() public pure returns (bytes32) {
-        return SPLToken.findAccount(bytes32(0));
+        return SPLTokenProgram.findAccount(bytes32(0));
     }
 
     /// @notice Mint new SPLToken directly on Solana chain
@@ -346,11 +346,11 @@ contract ERC20ForSplMintable is ERC20ForSPLBackbone {
         if (totalSupply() + amount > type(uint64).max) revert AmountExceedsUint64();
 
         bytes32 toSolana = solanaAccount(to);
-        if (SPLToken.isSystemAccount(toSolana)) {
-            SPLToken.initializeAccount(_salt(to), tokenMint);
+        if (SPLTokenProgram.isSystemAccount(toSolana)) {
+            SPLTokenProgram.initializeAccount(_salt(to), tokenMint);
         }
 
-        SPLToken.mintTo(tokenMint, toSolana, uint64(amount));
+        SPLTokenProgram.mintTo(tokenMint, toSolana, uint64(amount));
         emit Transfer(address(0), to, amount);
     }
 }
