@@ -9,10 +9,10 @@ import {QueryAccount} from "../../precompiles/QueryAccount.sol";
 import {SolanaDataConverterLib} from "../../utils/SolanaDataConverterLib.sol";
 
 
-/// @title ERC20ForSPLBackbone
+/// @title ERC20ForSplBackbone
 /// @author https://twitter.com/mnedelchev_
-/// @notice This contract serves as a backbone contract for both ERC20ForSPL and ERC20ForSPLMintable smart contracts.
-contract ERC20ForSPLBackbone {
+/// @notice This contract serves as a backbone contract for both ERC20ForSpl and ERC20ForSplMintable smart contracts.
+contract ERC20ForSplBackbone {
     using SolanaDataConverterLib for *;
 
     ISPLTokenProgram constant SPLTokenProgram = ISPLTokenProgram(0xFf00000000000000000000000000000000000004);
@@ -67,7 +67,7 @@ contract ERC20ForSPLBackbone {
     }
 
     /// @notice Returns the SPLToken balance of an address.
-    /// @dev Unlike typical ERC20 the balances of ERC20ForSPL are actually stored on Solana, this standard doesn't include balances mapping. There is condition to check if the account is a Neon EVM user or Solana user - if the user is from Solana then his ATA balance is also included into the total balance calculation.
+    /// @dev Unlike typical ERC20 the balances of ERC20ForSpl are actually stored on Solana, this standard doesn't include balances mapping. There is condition to check if the account is a Neon EVM user or Solana user - if the user is from Solana then his ATA balance is also included into the total balance calculation.
     function balanceOf(address account) public view returns (uint256) {
         uint balance = SPLTokenProgram.getAccount(solanaAccount(account)).amount;
         bytes32 solanaAddress = SolanaNative.solanaAddress(account);
@@ -130,8 +130,8 @@ contract ERC20ForSPLBackbone {
         return true;
     }
 
-    /// @notice ERC20ForSPL's approve method
-    /// @dev With ERC20ForSPL standard we can also make approvals on Solana-like addresses. These type of records are being stored directly on Solana and they're not being recorded inside the _allowances mapping.
+    /// @notice ERC20ForSpl's approve method
+    /// @dev With ERC20ForSpl standard we can also make approvals on Solana-like addresses. These type of records are being stored directly on Solana and they're not being recorded inside the _allowances mapping.
     /// @param spender The Solana-like address in bytes32 of the spender
     /// @param amount The amount to be managed by the spender
     /// @custom:getter getAccountDelegateData
@@ -148,8 +148,8 @@ contract ERC20ForSPLBackbone {
         return true;
     }
 
-    /// @notice ERC20ForSPL's transfer method
-    /// @dev With ERC20ForSPL standard we can also make transfers directly to Solana-like addresses. Balances data is being stored directly on Solana
+    /// @notice ERC20ForSpl's transfer method
+    /// @dev With ERC20ForSpl standard we can also make transfers directly to Solana-like addresses. Balances data is being stored directly on Solana
     /// @param to The Solana-like address in bytes32 of the receiver
     /// @param amount The amount to be transfered to the receiver
     /// @custom:getter balanceOf
@@ -258,7 +258,7 @@ contract ERC20ForSPLBackbone {
     }
 
     /// @notice Returns the Solana-like address which is binded to the Ethereum-like address.
-    /// @dev When an address interacts for the first time with ERC20ForSPL under the hood there is Solana account creation which is binded to the Ethereum-like address used on Neon chain.
+    /// @dev When an address interacts for the first time with ERC20ForSpl under the hood there is Solana account creation which is binded to the Ethereum-like address used on Neon chain.
     function solanaAccount(address account) public pure returns (bytes32) {
         return SPLTokenProgram.findAccount(_salt(account));
     }
@@ -294,7 +294,7 @@ contract ERC20ForSPLBackbone {
 /// @title ERC20ForSpl
 /// @author https://twitter.com/mnedelchev_
 /// @notice This contract serves as an interface contract of already deployed SPLToken on Solana. Through this interface an Ethereum-like address on Neon EVM chain can apply changes on SPLToken account on Solana.
-contract ERC20ForSpl is ERC20ForSPLBackbone {
+contract ERC20ForSpl is ERC20ForSplBackbone {
     /// @param _tokenMint The Solana-like address of the Token Mint on Solana
     constructor(bytes32 _tokenMint) {
         if (!SPLTokenProgram.getMint(_tokenMint).isInitialized) revert InvalidTokenMint();
@@ -308,7 +308,7 @@ contract ERC20ForSpl is ERC20ForSPLBackbone {
 /// @title ERC20ForSplMintable
 /// @author https://twitter.com/mnedelchev_
 /// @notice This contract serves as an interface to the deployed SPLToken on Solana. Through this interface, Ethereum-like address on Neon EVM chain can apply changes on SPLToken account on Solana.
-contract ERC20ForSplMintable is ERC20ForSPLBackbone {
+contract ERC20ForSplMintable is ERC20ForSplBackbone {
     address immutable _admin;
 
     /// @param _name The name of the SPLToken
