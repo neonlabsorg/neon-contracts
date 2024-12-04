@@ -5,6 +5,7 @@ require("dotenv").config();
 describe('Test init', async function () {
     let owner, user1, user2, user3;
     let ERC20ForSPLAddress = '';
+    let ERC20ForSPLFactoryAddress = '';
     let ERC20ForSPL;
     let ERC20ForSPLFactory;
     let tokenMintAccount;
@@ -12,7 +13,7 @@ describe('Test init', async function () {
     let user1SolanaPublicKey;
     let user2SolanaPublicKey;
     let grantedTestersWithBalance;
-    const TOKEN_MINT = '0xfe176848de34ed40bb9f684cac435af5704668cb628a3a72274a5399846fdb7a'; // J6sFtwqG57dWnoSdPN7tev8q6R43DL4TeVMeiYNjbiZf on Curve stand
+    const TOKEN_MINT = '0x0d0c990a1a37659ff1ff2728293c46b6884acae8aff2b7e48adf6d312f14de9e'; // swScfvoTjHwzSNCVnsb3KbyRtit2THfw59ozN4Z3pTo on Curve stand
     const TOKEN_MINT_DECIMALS = 6;
     const RECEIPTS_COUNT = 10;
 
@@ -56,6 +57,11 @@ describe('Test init', async function () {
         console.log('\nUser2 addresses:');
         console.log('Neon EVM address -', user2.address);
         console.log('Solana data account -', user2SolanaPublicKey);
+
+        console.log('\n Balances:');
+        console.log(await ERC20ForSPL.balanceOf(owner.address), 'owner');
+        console.log(await ERC20ForSPL.balanceOf(user1.address), 'user1');
+        console.log(await ERC20ForSPL.balanceOf(user2.address), 'user2');
 
         grantedTestersWithBalance = await ERC20ForSPL.balanceOf(owner.address) != 0 && await ERC20ForSPL.balanceOf(user1.address) != 0 && await ERC20ForSPL.balanceOf(user2.address) != 0;
     });
