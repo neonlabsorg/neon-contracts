@@ -4,10 +4,10 @@ require("dotenv").config();
 
 describe('Test init', async function () {
     let owner, user1, user2, user3;
-    let ERC20ForSPLAddress = '';
-    let ERC20ForSPLFactoryAddress = '';
-    let ERC20ForSPL;
+    let ERC20ForSPLFactoryAddress = '0xb475b459418a9A076e0872E1eF4D825848051b10';
+    let ERC20ForSPLAddress = '0x659C7181822AC928ec26aAA49A453681C8a9FE57';
     let ERC20ForSPLFactory;
+    let ERC20ForSPL;
     let tokenMintAccount;
     let ownerSolanaPublicKey;
     let user1SolanaPublicKey;
@@ -21,24 +21,29 @@ describe('Test init', async function () {
         [owner, user1, user2, user3] = await ethers.getSigners();
         const ERC20ForSplContractFactory = await ethers.getContractFactory('contracts/token/ERC20ForSpl/erc20_for_spl.sol:ERC20ForSpl');
         const ERC20ForSplFactoryContractFactory = await ethers.getContractFactory('contracts/token/ERC20ForSpl/erc20_for_spl_factory.sol:ERC20ForSplFactory');
-
-        // deploy Factory
-        ERC20ForSPLFactory = await ethers.deployContract('contracts/token/ERC20ForSpl/erc20_for_spl_factory.sol:ERC20ForSplFactory');
-        await ERC20ForSPLFactory.waitForDeployment();
-        console.log('\nCreating instance of just now deployed ERC20ForSplFactory contract on Neon EVM with address', "\x1b[32m", ERC20ForSPLFactory.target, "\x1b[30m", '\n'); 
         
+        if (ethers.isAddress(ERC20ForSPLFactoryAddress)) {
+            console.log('\nCreating instance of already deployed ERC20ForSPLFactory contract on Neon EVM with address', "\x1b[32m", ERC20ForSPLFactoryAddress, "\x1b[30m", '\n');
+            ERC20ForSPLFactory = ERC20ForSplFactoryContractFactory.attach(ERC20ForSPLFactoryAddress);
+        } else {
+            // deploy ERC20ForSPLFactory
+            ERC20ForSPLFactory = await ethers.deployContract('contracts/token/ERC20ForSpl/erc20_for_spl_factory.sol:ERC20ForSplFactory');
+            await ERC20ForSPLFactory.waitForDeployment();
+            console.log('\nCreating instance of just now deployed ERC20ForSplFactory contract on Neon EVM with address', "\x1b[32m", ERC20ForSPLFactory.target, "\x1b[30m", '\n'); 
+        }
+
         if (ethers.isAddress(ERC20ForSPLAddress)) {
             console.log('\nCreating instance of already deployed ERC20ForSPL contract on Neon EVM with address', "\x1b[32m", ERC20ForSPLAddress, "\x1b[30m", '\n');
             ERC20ForSPL = ERC20ForSplContractFactory.attach(ERC20ForSPLAddress);
         } else {
+            // deploy ERC20ForSPL
             tx = await ERC20ForSPLFactory.createErc20ForSpl(TOKEN_MINT);
             await tx.wait(RECEIPTS_COUNT);
 
             const getErc20ForSpl = await ERC20ForSPLFactory.getErc20ForSpl(TOKEN_MINT);
 
             ERC20ForSPL = ERC20ForSplContractFactory.attach(getErc20ForSpl);
-            ERC20ForSPLAddress = ERC20ForSPL.target;
-            console.log('\nCreating instance of just now deployed ERC20ForSPL contract on Neon EVM with address', "\x1b[32m", ERC20ForSPLAddress, "\x1b[30m", '\n'); 
+            console.log('\nCreating instance of just now deployed ERC20ForSPL contract on Neon EVM with address', "\x1b[32m", ERC20ForSPL.target, "\x1b[30m", '\n'); 
         }
         
         const TokenMintAccount = await ERC20ForSPL.tokenMint();

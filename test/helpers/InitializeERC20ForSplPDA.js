@@ -1,19 +1,14 @@
 const web3 = require("@solana/web3.js");
 const {
     getAssociatedTokenAddress,
-    createInitializeMint2Instruction,
     TOKEN_PROGRAM_ID,
-    ASSOCIATED_TOKEN_PROGRAM_ID,
-    MINT_SIZE,
-    createMintToInstruction,
-    createAssociatedTokenAccountInstruction
+    createInitializeAccount2Instruction,
+    createTransferInstruction
 } = require('@solana/spl-token');
-const { Metaplex } = require("@metaplex-foundation/js");
 const bs58 = require("bs58");
-const { createCreateMetadataAccountV3Instruction } = require("@metaplex-foundation/mpl-token-metadata");
 require("dotenv").config();
 
-/onst connection = new web3.Connection("https://api.devnet.solana.com", "processed");
+const connection = new web3.Connection("https://api.devnet.solana.com", "processed");
 //const connection = new web3.Connection(process.env.CURVESTAND_SOL, "processed");
 
 const keypair = web3.Keypair.fromSecretKey(
@@ -22,15 +17,49 @@ const keypair = web3.Keypair.fromSecretKey(
 console.log(keypair.publicKey.toBase58(), 'publicKey');
 
 async function init() {
-    
+    const tokenMint = new web3.PublicKey('CoDh2mktc3eBVseLZZs6PGBk5Fk5TjnMMTUtLGfYGk1e');
+    const tokenNeonPdaAccount = new web3.PublicKey('CoDh2mktc3eBVseLZZs6PGBk5Fk5TjnMMTUtLGfYGk1e');
+    const account = new web3.PublicKey('41Dzti2JuC1jumK5AfjxBSvYGhxtNPLGav54x7K8pnhD');
+
+    let keypairAta = await getAssociatedTokenAddress(
+        tokenMint,
+        keypair.publicKey,
+        false
+    );
+    console.log(keypairAta, 'keypairAta');
+
     let tx = new web3.Transaction();
     tx.add(
         web3.SystemProgram.allocate({
-            accountPubkey: allocatedAccount.publicKey,
+            accountPubkey: account,
             space: 165
         })
     );
 
+    tx.add(
+        web3.SystemProgram.assign({
+            accountPubkey: account,
+            programId: TOKEN_PROGRAM_ID
+        })
+    );
+
+    tx.add(
+        createInitializeAccount2Instruction(
+            account, 
+            tokenMint, 
+            tokenNeonPdaAccount
+        )
+    );
+
+    tx.add(
+        createTransferInstruction(
+            keypairAta,
+            account,
+            keypair.publicKey,
+            10 * 10 ** 9,
+            []
+        )
+    );
     
     await web3.sendAndConfirmTransaction(connection, tx, [keypair]);
     return;
