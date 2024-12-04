@@ -58,7 +58,7 @@ module.exports = {
       gasPrice: "auto",
     },
     curvestand: {
-        url: "https://curve-stand.neontest.xyz/",
+        url: process.env.CURVESTAND,
         accounts: [process.env.PRIVATE_KEY_OWNER, process.env.USER1_KEY, process.env.USER2_KEY, process.env.USER3_KEY],
         allowUnlimitedContractSize: false,
         gas: "auto",
