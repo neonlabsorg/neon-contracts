@@ -13,7 +13,7 @@ describe('Test init', async function () {
     let user1SolanaPublicKey;
     let user2SolanaPublicKey;
     let grantedTestersWithBalance;
-    const TOKEN_MINT = '0x0d0c990a1a37659ff1ff2728293c46b6884acae8aff2b7e48adf6d312f14de9e'; // swScfvoTjHwzSNCVnsb3KbyRtit2THfw59ozN4Z3pTo on Curve stand
+    const TOKEN_MINT = '0xaf479f4b3ad213e98cc31f54c3225422a474e8a7132ccd99be3a51fef80f4679'; // CoDh2mktc3eBVseLZZs6PGBk5Fk5TjnMMTUtLGfYGk1e on Curve stand
     const TOKEN_MINT_DECIMALS = 6;
     const RECEIPTS_COUNT = 10;
 

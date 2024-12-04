@@ -21,7 +21,7 @@ const keypair = web3.Keypair.fromSecretKey(
 console.log(keypair.publicKey.toBase58(), 'publicKey');
 
 async function init() {
-    console.log(await connection.getTokenSupply(new web3.PublicKey('swScfvoTjHwzSNCVnsb3KbyRtit2THfw59ozN4Z3pTo')), 'getTokenSupply');
+    console.log(await connection.getTokenSupply(new web3.PublicKey('CoDh2mktc3eBVseLZZs6PGBk5Fk5TjnMMTUtLGfYGk1e')), 'getTokenSupply');
     return;
 
     const seed = 'seed' + Date.now().toString(); // random seed on each script call
