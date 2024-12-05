@@ -1,19 +1,24 @@
 const { ethers } = require("hardhat");
 const { expect } = require("chai");
+const web3 = require("@solana/web3.js");
 require("dotenv").config();
 
 describe('Test init', async function () {
     let owner, user1, user2, user3;
-    let ERC20ForSPLFactoryAddress = '0xb475b459418a9A076e0872E1eF4D825848051b10';
-    let ERC20ForSPLAddress = '0x659C7181822AC928ec26aAA49A453681C8a9FE57';
+    let ERC20ForSPLFactoryAddress = '0x52320976F2D65180B5E6499C2C9acd4AfBa467e5';
+    let ERC20ForSPLAddress = '0xb475b459418a9A076e0872E1eF4D825848051b10';
+    let approverATAWithTokens = 'EVW8d8254iCKFhNpXGipKJTqcuVQsPkUpUxvpqQ4x7vR';
     let ERC20ForSPLFactory;
     let ERC20ForSPL;
     let tokenMintAccount;
     let ownerSolanaPublicKey;
     let user1SolanaPublicKey;
     let user2SolanaPublicKey;
+    let user3SolanaPublicKey;
     let grantedTestersWithBalance;
-    const TOKEN_MINT = '0xaf479f4b3ad213e98cc31f54c3225422a474e8a7132ccd99be3a51fef80f4679'; // CoDh2mktc3eBVseLZZs6PGBk5Fk5TjnMMTUtLGfYGk1e on Curve stand
+    let tx;
+    let neon_getEvmParams;
+    const TOKEN_MINT = '0xe7bb92b2b90db6ba69a783ff239daec15ef08c1a4b6f8e65aa423d26018412ce'; // Gbb4zD39NupDG4ZEM73GmXLMBPS1CqPnPZpxcQUToizq on Curve stand
     const TOKEN_MINT_DECIMALS = 6;
     const RECEIPTS_COUNT = 10;
 
@@ -36,21 +41,38 @@ describe('Test init', async function () {
             console.log('\nCreating instance of already deployed ERC20ForSPL contract on Neon EVM with address', "\x1b[32m", ERC20ForSPLAddress, "\x1b[30m", '\n');
             ERC20ForSPL = ERC20ForSplContractFactory.attach(ERC20ForSPLAddress);
         } else {
+            // ====== TEMPORARY ======
+            ERC20ForSPL = await ethers.deployContract('contracts/token/ERC20ForSpl/erc20_for_spl.sol:ERC20ForSpl', [
+                TOKEN_MINT,
+                [
+                    owner.address,
+                    user1.address,
+                    user2.address,
+                    user3.address
+                ]
+            ]);
+            await ERC20ForSPL.waitForDeployment();
+            // ====== /TEMPORARY ======
+
             // deploy ERC20ForSPL
-            tx = await ERC20ForSPLFactory.createErc20ForSpl(TOKEN_MINT);
+            /* tx = await ERC20ForSPLFactory.createErc20ForSpl(TOKEN_MINT);
             await tx.wait(RECEIPTS_COUNT);
 
             const getErc20ForSpl = await ERC20ForSPLFactory.getErc20ForSpl(TOKEN_MINT);
 
-            ERC20ForSPL = ERC20ForSplContractFactory.attach(getErc20ForSpl);
-            console.log('\nCreating instance of just now deployed ERC20ForSPL contract on Neon EVM with address', "\x1b[32m", ERC20ForSPL.target, "\x1b[30m", '\n'); 
+            ERC20ForSPL = ERC20ForSplContractFactory.attach(getErc20ForSpl);  */
+            console.log('\nCreating instance of just now deployed ERC20ForSPL contract on Neon EVM with address', "\x1b[32m", ERC20ForSPL.target, "\x1b[30m", '\n');
         }
-        
+
+        /* let tx = await ERC20ForSPL.connect(owner).claim('0x0684ef1336019426b3abe2521d3c26fc36b5c277f6ac345c0450d50ce7b0db5a', 100);
+        await tx.wait(10); */
+
         const TokenMintAccount = await ERC20ForSPL.tokenMint();
         tokenMintAccount = ethers.encodeBase58(TokenMintAccount);
         ownerSolanaPublicKey = ethers.encodeBase58(await ERC20ForSPL.solanaAccount(owner.address));
         user1SolanaPublicKey = ethers.encodeBase58(await ERC20ForSPL.solanaAccount(user1.address));
         user2SolanaPublicKey = ethers.encodeBase58(await ERC20ForSPL.solanaAccount(user2.address));
+        user3SolanaPublicKey = ethers.encodeBase58(await ERC20ForSPL.solanaAccount(user3.address));
         console.log('\nTokenMintAccount -', TokenMintAccount);
         console.log('tokenMintAccount -', tokenMintAccount);
         console.log('\nOwner addresses:');
@@ -62,23 +84,50 @@ describe('Test init', async function () {
         console.log('\nUser2 addresses:');
         console.log('Neon EVM address -', user2.address);
         console.log('Solana data account -', user2SolanaPublicKey);
+        console.log('\nUser3 addresses:');
+        console.log('Neon EVM address -', user3.address);
+        console.log('Solana data account -', user3SolanaPublicKey);
 
         console.log('\n Balances:');
         console.log(await ERC20ForSPL.balanceOf(owner.address), 'owner');
         console.log(await ERC20ForSPL.balanceOf(user1.address), 'user1');
         console.log(await ERC20ForSPL.balanceOf(user2.address), 'user2');
+        console.log(await ERC20ForSPL.balanceOf(user3.address), 'user3');
 
         grantedTestersWithBalance = await ERC20ForSPL.balanceOf(owner.address) != 0 && await ERC20ForSPL.balanceOf(user1.address) != 0 && await ERC20ForSPL.balanceOf(user2.address) != 0;
     });
 
     describe('ERC20ForSPL tests', function() {
         it('validate empty storage slots', async function () {
-            expect(await ethers.provider.getStorage(ERC20ForSPL.target, 0)).to.eq('0x0000000000000000000000000000000000000000000000000000000000000000');
-            expect(await ethers.provider.getStorage(ERC20ForSPL.target, 1)).to.eq('0x0000000000000000000000000000000000000000000000000000000000000000');
-            expect(await ethers.provider.getStorage(ERC20ForSPL.target, 2)).to.eq('0x0000000000000000000000000000000000000000000000000000000000000000');
-            expect(await ethers.provider.getStorage(ERC20ForSPL.target, 3)).to.eq('0x0000000000000000000000000000000000000000000000000000000000000000');
-            expect(await ethers.provider.getStorage(ERC20ForSPL.target, 4)).to.eq('0x0000000000000000000000000000000000000000000000000000000000000000');
-            expect(await ethers.provider.getStorage(ERC20ForSPL.target, 5)).to.eq('0x0000000000000000000000000000000000000000000000000000000000000000');
+            for (let i = 0; i < 10; ++i) {
+                expect(await ethers.provider.getStorage(ERC20ForSPL.target, i)).to.eq('0x0000000000000000000000000000000000000000000000000000000000000000');
+            }
+        });
+
+        it('test claim & claimTo', async function () {
+            if (approverATAWithTokens != '') {
+                const ownerBalance = await ERC20ForSPL.balanceOf(owner.address);
+                tx = await ERC20ForSPL.connect(owner).claim(
+                    ethers.zeroPadValue(ethers.toBeHex(ethers.decodeBase58(new web3.PublicKey(approverATAWithTokens).toBase58())), 32),
+                    ethers.parseUnits('1', TOKEN_MINT_DECIMALS)
+                );
+                await tx.wait(RECEIPTS_COUNT);
+
+                expect(await ERC20ForSPL.balanceOf(owner.address)).to.be.greaterThan(ownerBalance);
+
+                const user1Balance = await ERC20ForSPL.balanceOf(user1.address);
+                tx = await ERC20ForSPL.connect(owner).claimTo(
+                    ethers.zeroPadValue(ethers.toBeHex(ethers.decodeBase58(new web3.PublicKey(approverATAWithTokens).toBase58())), 32),
+                    user1.address,
+                    ethers.parseUnits('1', TOKEN_MINT_DECIMALS)
+                );
+                await tx.wait(RECEIPTS_COUNT);
+
+                expect(await ERC20ForSPL.balanceOf(user1.address)).to.be.greaterThan(user1Balance);
+            } else {
+                console.log('Empty approverATAWithTokens - skipping test');
+                this.skip();
+            }
         });
 
         it('burn from owner', async function () {
@@ -227,10 +276,6 @@ describe('Test init', async function () {
             } else {
                 this.skip();
             }
-        });
-
-        it('claim method', async function () {
-
         });
 
         it('Malicious transfer ( supposed to revert )', async function () {

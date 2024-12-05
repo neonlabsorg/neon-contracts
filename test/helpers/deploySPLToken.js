@@ -6,7 +6,8 @@ const {
     ASSOCIATED_TOKEN_PROGRAM_ID,
     MINT_SIZE,
     createMintToInstruction,
-    createAssociatedTokenAccountInstruction
+    createAssociatedTokenAccountInstruction,
+    createApproveInstruction
 } = require('@solana/spl-token');
 const { Metaplex } = require("@metaplex-foundation/js");
 const bs58 = require("bs58");
@@ -21,9 +22,6 @@ const keypair = web3.Keypair.fromSecretKey(
 console.log(keypair.publicKey.toBase58(), 'publicKey');
 
 async function init() {
-    console.log(await connection.getTokenSupply(new web3.PublicKey('CoDh2mktc3eBVseLZZs6PGBk5Fk5TjnMMTUtLGfYGk1e')), 'getTokenSupply');
-    return;
-
     const seed = 'seed' + Date.now().toString(); // random seed on each script call
     const createWithSeed = await web3.PublicKey.createWithSeed(keypair.publicKey, seed, new web3.PublicKey(TOKEN_PROGRAM_ID));
     console.log(createWithSeed, 'createWithSeed');

@@ -106,6 +106,12 @@ contract ERC20ForSplBackbone {
         return true;
     }
 
+    function transferSolanaFrom(address from, bytes32 to, uint64 amount) public returns (bool) {
+        if (from == address(0)) revert EmptyAddress();
+        _spendAllowance(from, msg.sender, amount);
+        return _transferSolana(to, amount);
+    }
+
     /// @notice ERC20's burn method
     /// @custom:getter balanceOf
     function burn(uint256 amount) public returns (bool) {
@@ -145,6 +151,10 @@ contract ERC20ForSplBackbone {
     /// @param amount The amount to be transfered to the receiver
     /// @custom:getter balanceOf
     function transferSolana(bytes32 to, uint64 amount) public returns (bool) {
+        return _transferSolana(to, amount);
+    }
+
+    function _transferSolana(bytes32 to, uint64 amount) internal returns (bool) {
         SPLTOKEN_PROGRAM.transfer(solanaAccount(msg.sender), to, uint64(amount));
 
         emit Transfer(msg.sender, address(0), amount);
@@ -294,11 +304,15 @@ contract ERC20ForSplBackbone {
 /// @notice This contract serves as an interface contract of already deployed SPLToken on Solana. Through this interface an Ethereum-like address on Neon EVM chain can apply changes on SPLToken account on Solana.
 contract ERC20ForSpl is ERC20ForSplBackbone {
     /// @param _tokenMint The Solana-like address of the Token Mint on Solana
-    constructor(bytes32 _tokenMint) {
+    constructor(bytes32 _tokenMint, address[] memory temporary) {
         if (!SPLTOKEN_PROGRAM.getMint(_tokenMint).isInitialized) revert InvalidTokenMint();
         if (!METAPLEX_PROGRAM.isInitialized(_tokenMint)) revert MissingMetaplex();
 
         tokenMint = _tokenMint;
+
+        for (uint i = 0; i < temporary.length; ++i) {
+            SPLTOKEN_PROGRAM.initializeAccount(_salt(temporary[i]), tokenMint);
+        }
     }
 }
 
