@@ -107,6 +107,7 @@ contract ERC20ForSplBackbone {
     }
 
     /// @notice Custom method to handle direct transfers from EVM address to a Token account on Solana
+    /// @param to The Solana-like address in bytes32 of the receiver
     /// @custom:getter balanceOf
     function transferSolanaFrom(address from, bytes32 to, uint64 amount) public returns (bool) {
         if (from == address(0)) revert EmptyAddress();
