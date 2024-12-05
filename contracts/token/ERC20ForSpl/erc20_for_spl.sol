@@ -106,6 +106,8 @@ contract ERC20ForSplBackbone {
         return true;
     }
 
+    /// @notice Custom method to handle direct transfers from EVM address to a Token account on Solana
+    /// @custom:getter balanceOf
     function transferSolanaFrom(address from, bytes32 to, uint64 amount) public returns (bool) {
         if (from == address(0)) revert EmptyAddress();
         _spendAllowance(from, msg.sender, amount);
@@ -152,14 +154,6 @@ contract ERC20ForSplBackbone {
     /// @custom:getter balanceOf
     function transferSolana(bytes32 to, uint64 amount) public returns (bool) {
         return _transferSolana(to, amount);
-    }
-
-    function _transferSolana(bytes32 to, uint64 amount) internal returns (bool) {
-        SPLTOKEN_PROGRAM.transfer(solanaAccount(msg.sender), to, uint64(amount));
-
-        emit Transfer(msg.sender, address(0), amount);
-        emit TransferSolana(msg.sender, to, amount);
-        return true;
     }
 
     /// @notice Calling method claimTo with msg.sender to parameter
@@ -214,7 +208,7 @@ contract ERC20ForSplBackbone {
         emit Transfer(from, address(0), amount);
     }
 
-    /// @notice Internal method to transfer amounts of the SPLToken on Solana.
+    /// @notice Internal method to transfer amounts of the SPLToken on Solana to a EVM address
     function _transfer(address from, address to, uint256 amount) internal {
         if (to == address(0)) revert EmptyAddress();
 
@@ -263,6 +257,15 @@ contract ERC20ForSplBackbone {
         }
 
         emit Transfer(from, to, amount);
+    }
+
+    /// @notice Internal method to transfer amounts of the SPLToken on Solana to a Token account
+    function _transferSolana(bytes32 to, uint64 amount) internal returns (bool) {
+        SPLTOKEN_PROGRAM.transfer(solanaAccount(msg.sender), to, uint64(amount));
+
+        emit Transfer(msg.sender, address(0), amount);
+        emit TransferSolana(msg.sender, to, amount);
+        return true;
     }
 
     /// @notice Returns the Solana-like address which is binded to the Ethereum-like address.
