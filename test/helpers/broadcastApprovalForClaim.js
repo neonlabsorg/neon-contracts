@@ -4,6 +4,7 @@ const {
     createApproveInstruction,
 } = require('@solana/spl-token');
 const bs58 = require("bs58");
+const { config } = require('../config');
 require("dotenv").config();
 
 //const connection = new web3.Connection("https://api.devnet.solana.com", "processed");
@@ -33,14 +34,12 @@ async function init() {
     );
     console.log(keypairTokenAta, 'keypairTokenAta');
 
-    const neonAccountAddressBytes = Buffer.concat([Buffer.alloc(12), Buffer.from(isValidHex(userAddress) ? userAddress.substring(2) : userAddress, 'hex')]);
-    const seed = [
-        new Uint8Array([0x03]),
-        new Uint8Array(Buffer.from('AUTH', 'utf-8')),
-        Buffer.from(ERC20ForSPL.substring(2), 'hex'),
-        Buffer.from(neonAccountAddressBytes, 'hex')
-    ];
-    const delegatedPda = web3.PublicKey.findProgramAddressSync(seed, new web3.PublicKey(neon_getEvmParams.result.neonEvmProgramId));
+    const delegatedPda = config.utils.calculatePdaAccount(
+        'AUTH',
+        ERC20ForSPL,
+        userAddress,
+        new web3.PublicKey(neon_getEvmParams.result.neonEvmProgramId)
+    );
     console.log(delegatedPda, 'delegatedPda');
 
     const tx = new web3.Transaction();
@@ -57,12 +56,3 @@ async function init() {
     return;
 }
 init();
-
-function isValidHex(hex) {
-    const isHexStrict = /^(0x)?[0-9a-f]*$/i.test(hex.toString());
-    if (!isHexStrict) {
-        throw new Error(`Given value "${hex}" is not a valid hex string.`);
-    } else {
-        return isHexStrict;
-    }
-}

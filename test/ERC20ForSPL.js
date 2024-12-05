@@ -1,6 +1,7 @@
 const { ethers } = require("hardhat");
 const { expect } = require("chai");
 const web3 = require("@solana/web3.js");
+const { config } = require('./config');
 require("dotenv").config();
 
 describe('Test init', async function () {
@@ -18,7 +19,7 @@ describe('Test init', async function () {
     let grantedTestersWithBalance;
     let tx;
     let neon_getEvmParams;
-    const TOKEN_MINT = '0xe7bb92b2b90db6ba69a783ff239daec15ef08c1a4b6f8e65aa423d26018412ce'; // Gbb4zD39NupDG4ZEM73GmXLMBPS1CqPnPZpxcQUToizq on Curve stand
+    const TOKEN_MINT = config.utils.publicKeyToBytes32('Gbb4zD39NupDG4ZEM73GmXLMBPS1CqPnPZpxcQUToizq'); // SPLToken on Curve stand
     const TOKEN_MINT_DECIMALS = 6;
     const RECEIPTS_COUNT = 10;
 
@@ -64,9 +65,6 @@ describe('Test init', async function () {
             console.log('\nCreating instance of just now deployed ERC20ForSPL contract on Neon EVM with address', "\x1b[32m", ERC20ForSPL.target, "\x1b[30m", '\n');
         }
 
-        /* let tx = await ERC20ForSPL.connect(owner).claim('0x0684ef1336019426b3abe2521d3c26fc36b5c277f6ac345c0450d50ce7b0db5a', 100);
-        await tx.wait(10); */
-
         const TokenMintAccount = await ERC20ForSPL.tokenMint();
         tokenMintAccount = ethers.encodeBase58(TokenMintAccount);
         ownerSolanaPublicKey = ethers.encodeBase58(await ERC20ForSPL.solanaAccount(owner.address));
@@ -108,7 +106,7 @@ describe('Test init', async function () {
             if (approverATAWithTokens != '') {
                 const ownerBalance = await ERC20ForSPL.balanceOf(owner.address);
                 tx = await ERC20ForSPL.connect(owner).claim(
-                    ethers.zeroPadValue(ethers.toBeHex(ethers.decodeBase58(new web3.PublicKey(approverATAWithTokens).toBase58())), 32),
+                    config.utils.publicKeyToBytes32(approverATAWithTokens),
                     ethers.parseUnits('1', TOKEN_MINT_DECIMALS)
                 );
                 await tx.wait(RECEIPTS_COUNT);
@@ -117,7 +115,7 @@ describe('Test init', async function () {
 
                 const user1Balance = await ERC20ForSPL.balanceOf(user1.address);
                 tx = await ERC20ForSPL.connect(owner).claimTo(
-                    ethers.zeroPadValue(ethers.toBeHex(ethers.decodeBase58(new web3.PublicKey(approverATAWithTokens).toBase58())), 32),
+                    config.utils.publicKeyToBytes32(approverATAWithTokens),
                     user1.address,
                     ethers.parseUnits('1', TOKEN_MINT_DECIMALS)
                 );
