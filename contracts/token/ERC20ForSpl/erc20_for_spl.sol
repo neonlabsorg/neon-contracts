@@ -212,18 +212,22 @@ contract ERC20ForSplBackbone {
     /// @notice Internal method to transfer amounts of the SPLToken on Solana to a EVM address
     function _transfer(address from, address to, uint256 amount) internal {
         if (to == address(0)) revert EmptyAddress();
+        if (amount > type(uint64).max) revert AmountExceedsUint64();
 
         bytes32 fromSolanaPDA = solanaAccount(from);
-        bytes32 fromSolanaATA;
+        bytes32 fromSolanaATA;  
         bytes32 fromSolanaAccount = SOLANA_NATIVE.solanaAddress(from);
-        uint64 getAvailableATABalance;
+        uint64 availableATABalance;
         if (fromSolanaAccount != bytes32(0)) {
             fromSolanaATA = getTokenMintATA(fromSolanaAccount);
             if (!SPLTOKEN_PROGRAM.isSystemAccount(fromSolanaATA)) {
                 ISPLTokenProgram.Account memory tokenMintATAData = SPLTOKEN_PROGRAM.getAccount(fromSolanaATA);
-                getAvailableATABalance+= (tokenMintATAData.delegated_amount > tokenMintATAData.amount) ? tokenMintATAData.amount : tokenMintATAData.delegated_amount;
+                availableATABalance+= (tokenMintATAData.delegated_amount > tokenMintATAData.amount) ? tokenMintATAData.amount : tokenMintATAData.delegated_amount;
             }
         }
+
+        uint64 pdaBalance = SPLTOKEN_PROGRAM.getAccount(fromSolanaPDA).amount;
+        if (pdaBalance + availableATABalance < amount) revert AmountExceedsBalance();
 
         bytes32 toSolana;
         bytes32 toSolanaAccount = SOLANA_NATIVE.solanaAddress(to);
@@ -242,11 +246,8 @@ contract ERC20ForSplBackbone {
             SPLTOKEN_PROGRAM.initializeAccount(_salt(to), tokenMint);
         }
 
-        if (amount > type(uint64).max) revert AmountExceedsUint64();
-        if (SPLTOKEN_PROGRAM.getAccount(fromSolanaPDA).amount + getAvailableATABalance < amount) revert AmountExceedsBalance();
-
         // always spending the PDA balance with higher priority
-        uint64 amountFromPDA = (uint64(amount) > SPLTOKEN_PROGRAM.getAccount(fromSolanaPDA).amount) ? SPLTOKEN_PROGRAM.getAccount(fromSolanaPDA).amount : uint64(amount);
+        uint64 amountFromPDA = (uint64(amount) > pdaBalance) ? pdaBalance : uint64(amount);
         uint64 amountFromATA = uint64(amount) - amountFromPDA;
 
         if (amountFromPDA != 0) {

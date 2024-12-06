@@ -17,7 +17,7 @@ console.log(keypair.publicKey.toBase58(), 'publicKey');
 
 async function init() {
     const tokenMint = new web3.PublicKey('Gbb4zD39NupDG4ZEM73GmXLMBPS1CqPnPZpxcQUToizq');
-    const ERC20ForSPL = '0xb475b459418a9A076e0872E1eF4D825848051b10'; // EVM address for erc20forspl contract
+    const ERC20ForSPL = '0x2639EC8aEfB542E4bDFCCcfd1B0d05076760AE26'; // EVM address for erc20forspl contract
     const userAddress = '0xAB1c34b53F12980a4fa9043B70c864CEE6891c0C'; // EVM address for the user
 
     const neon_getEvmParamsRequest = await fetch(process.env.CURVESTAND, {

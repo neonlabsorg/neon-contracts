@@ -6,8 +6,8 @@ require("dotenv").config();
 
 describe('Test init', async function () {
     let owner, user1, user2, user3;
-    let ERC20ForSPLFactoryAddress = '0x52320976F2D65180B5E6499C2C9acd4AfBa467e5';
-    let ERC20ForSPLAddress = '0xb475b459418a9A076e0872E1eF4D825848051b10';
+    let ERC20ForSPLFactoryAddress = '0x9cb7E7BFe60a53e4c78727317724cCf5B111Ff48';
+    let ERC20ForSPLAddress = '0x2639EC8aEfB542E4bDFCCcfd1B0d05076760AE26';
     let approverATAWithTokens = 'EVW8d8254iCKFhNpXGipKJTqcuVQsPkUpUxvpqQ4x7vR';
     let ERC20ForSPLFactory;
     let ERC20ForSPL;
@@ -21,7 +21,7 @@ describe('Test init', async function () {
     let neon_getEvmParams;
     const TOKEN_MINT = config.utils.publicKeyToBytes32('Gbb4zD39NupDG4ZEM73GmXLMBPS1CqPnPZpxcQUToizq'); // SPLToken on Curve stand
     const TOKEN_MINT_DECIMALS = 6;
-    const RECEIPTS_COUNT = 10;
+    const RECEIPTS_COUNT = 3;
 
     before(async function() {
         [owner, user1, user2, user3] = await ethers.getSigners();

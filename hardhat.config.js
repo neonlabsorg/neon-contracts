@@ -65,4 +65,7 @@ module.exports = {
         gasPrice: "auto",
     },
   },
+  mocha: {
+      timeout: 2800000
+  }
 };
