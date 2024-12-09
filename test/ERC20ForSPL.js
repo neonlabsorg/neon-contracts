@@ -17,7 +17,6 @@ describe('Test init', async function () {
     let user2SolanaPublicKey;
     let user3SolanaPublicKey;
     let grantedTestersWithBalance;
-    let tx;
     const TOKEN_MINT = config.utils.publicKeyToBytes32(config.DATA.ADDRESSES.ERC20ForSplTokenMint);
     const TOKEN_MINT_DECIMALS = 9;
     const RECEIPTS_COUNT = 3;
@@ -92,7 +91,7 @@ describe('Test init', async function () {
         it('test claim & claimTo', async function () {
             if (approverATAWithTokens != '') {
                 const ownerBalance = await ERC20ForSPL.balanceOf(owner.address);
-                tx = await ERC20ForSPL.connect(owner).claim(
+                let tx = await ERC20ForSPL.connect(owner).claim(
                     config.utils.publicKeyToBytes32(approverATAWithTokens),
                     ethers.parseUnits('1', TOKEN_MINT_DECIMALS)
                 );
