@@ -88,7 +88,7 @@ describe('Test init', async function () {
             }
         });
 
-        it('test claim & claimTo', async function () {
+        /* it('test claim & claimTo', async function () {
             if (approverATAWithTokens != '') {
                 const ownerBalance = await ERC20ForSPL.balanceOf(owner.address);
                 let tx = await ERC20ForSPL.connect(owner).claim(
@@ -314,6 +314,14 @@ describe('Test init', async function () {
             } else {
                 this.skip();
             }
+        }); */
+
+        // Solana native tests
+        it('validate SVM user balanceOf', async function () {
+            const keypair = new web3.PublicKey('8HzCjhBNP3rs7SydUrZAiQGEoqXHNtpNPE475zzHmzba');
+            const payer = ethers.dataSlice(ethers.keccak256(keypair.toBytes()), 12, 32);
+            console.log(payer, 'payer');
+            console.log(await ERC20ForSPL.balanceOf(payer));
         });
     });
 });

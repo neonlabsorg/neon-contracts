@@ -32,6 +32,7 @@ async function init() {
         false
     );
     console.log(keypairTokenAta, 'keypairTokenAta');
+    return;
 
     const delegatedPda = config.utils.calculatePdaAccount(
         'AUTH',

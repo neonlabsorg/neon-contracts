@@ -21,9 +21,11 @@ const keypair = web3.Keypair.fromSecretKey(
 console.log(keypair.publicKey.toBase58(), 'publicKey');
 
 async function init() {
-    const seed = 'seed' + Date.now().toString(); // random seed on each script call
+    /* const seed = 'seed' + Date.now().toString(); // random seed on each script call
     const createWithSeed = await web3.PublicKey.createWithSeed(keypair.publicKey, seed, new web3.PublicKey(TOKEN_PROGRAM_ID));
-    console.log(createWithSeed, 'createWithSeed');
+    console.log(createWithSeed, 'createWithSeed'); */
+
+    
 
     let keypairAta = await getAssociatedTokenAddress(
         createWithSeed,
