@@ -7,7 +7,6 @@ const bs58 = require("bs58");
 const { config } = require('../config');
 require("dotenv").config();
 
-//const connection = new web3.Connection("https://api.devnet.solana.com", "processed");
 const connection = new web3.Connection(process.env.CURVESTAND_SOL, "processed");
 
 const keypair = web3.Keypair.fromSecretKey(
@@ -16,9 +15,9 @@ const keypair = web3.Keypair.fromSecretKey(
 console.log(keypair.publicKey.toBase58(), 'publicKey');
 
 async function init() {
-    const tokenMint = new web3.PublicKey('Gbb4zD39NupDG4ZEM73GmXLMBPS1CqPnPZpxcQUToizq');
-    const ERC20ForSPL = '0x2639EC8aEfB542E4bDFCCcfd1B0d05076760AE26'; // EVM address for erc20forspl contract
-    const userAddress = '0xAB1c34b53F12980a4fa9043B70c864CEE6891c0C'; // EVM address for the user
+    const tokenMint = new web3.PublicKey(config.DATA.ADDRESSES.ERC20ForSplTokenMint);
+    const ERC20ForSPL = config.DATA.ADDRESSES.ERC20ForSpl;
+    const userAddress = '0xAB1c34b53F12980a4fa9043B70c864CEE6891c0C';
 
     const neon_getEvmParamsRequest = await fetch(process.env.CURVESTAND, {
         method: 'POST',

@@ -309,15 +309,11 @@ contract ERC20ForSplBackbone {
 /// @notice This contract serves as an interface contract of already deployed SPLToken on Solana. Through this interface an Ethereum-like address on Neon EVM chain can apply changes on SPLToken account on Solana.
 contract ERC20ForSpl is ERC20ForSplBackbone {
     /// @param _tokenMint The Solana-like address of the Token Mint on Solana
-    constructor(bytes32 _tokenMint, address[] memory temporary) {
+    constructor(bytes32 _tokenMint) {
         if (!SPLTOKEN_PROGRAM.getMint(_tokenMint).isInitialized) revert InvalidTokenMint();
         if (!METAPLEX_PROGRAM.isInitialized(_tokenMint)) revert MissingMetaplex();
 
         tokenMint = _tokenMint;
-
-        for (uint i = 0; i < temporary.length; ++i) {
-            SPLTOKEN_PROGRAM.initializeAccount(_salt(temporary[i]), tokenMint);
-        }
     }
 }
 

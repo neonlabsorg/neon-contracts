@@ -1,6 +1,13 @@
 const web3 = require("@solana/web3.js");
 
 const config = {
+    DATA: {
+        ADDRESSES: {
+            ERC20ForSplFactory: '0x40e33C96bd3ffcD4E3ee2c67b3A750D46282EF2E',
+            ERC20ForSpl: '0x4914ddea410894Fe3789ACeb70Ac6b2c85117d86',
+            ERC20ForSplTokenMint: 'Fq29HDC7MUAu8sUAqFdjPtdCcVVSitvK1wezy7gMpNE3'
+        }
+    },
     utils: {
         publicKeyToBytes32: function(pubkey) {
             return ethers.zeroPadValue(ethers.toBeHex(ethers.decodeBase58(pubkey)), 32);

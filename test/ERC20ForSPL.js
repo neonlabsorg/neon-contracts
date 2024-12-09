@@ -6,9 +6,9 @@ require("dotenv").config();
 
 describe('Test init', async function () {
     let owner, user1, user2, user3;
-    let ERC20ForSPLFactoryAddress = '0x9cb7E7BFe60a53e4c78727317724cCf5B111Ff48';
-    let ERC20ForSPLAddress = '0x2639EC8aEfB542E4bDFCCcfd1B0d05076760AE26';
-    let approverATAWithTokens = 'EVW8d8254iCKFhNpXGipKJTqcuVQsPkUpUxvpqQ4x7vR';
+    const ERC20ForSPLFactoryAddress = config.DATA.ADDRESSES.ERC20ForSplFactory;
+    const ERC20ForSPLAddress = config.DATA.ADDRESSES.ERC20ForSpl;
+    const approverATAWithTokens = 'By6gUjV57cX99qpEx4QWuhpWiExGvUFkSxUQcbuMVPnb';
     let ERC20ForSPLFactory;
     let ERC20ForSPL;
     let tokenMintAccount;
@@ -18,9 +18,8 @@ describe('Test init', async function () {
     let user3SolanaPublicKey;
     let grantedTestersWithBalance;
     let tx;
-    let neon_getEvmParams;
-    const TOKEN_MINT = config.utils.publicKeyToBytes32('Gbb4zD39NupDG4ZEM73GmXLMBPS1CqPnPZpxcQUToizq'); // SPLToken on Curve stand
-    const TOKEN_MINT_DECIMALS = 6;
+    const TOKEN_MINT = config.utils.publicKeyToBytes32(config.DATA.ADDRESSES.ERC20ForSplTokenMint);
+    const TOKEN_MINT_DECIMALS = 9;
     const RECEIPTS_COUNT = 3;
 
     before(async function() {
@@ -42,26 +41,13 @@ describe('Test init', async function () {
             console.log('\nCreating instance of already deployed ERC20ForSPL contract on Neon EVM with address', "\x1b[32m", ERC20ForSPLAddress, "\x1b[30m", '\n');
             ERC20ForSPL = ERC20ForSplContractFactory.attach(ERC20ForSPLAddress);
         } else {
-            // ====== TEMPORARY ======
-            ERC20ForSPL = await ethers.deployContract('contracts/token/ERC20ForSpl/erc20_for_spl.sol:ERC20ForSpl', [
-                TOKEN_MINT,
-                [
-                    owner.address,
-                    user1.address,
-                    user2.address,
-                    user3.address
-                ]
-            ]);
-            await ERC20ForSPL.waitForDeployment();
-            // ====== /TEMPORARY ======
-
             // deploy ERC20ForSPL
-            /* tx = await ERC20ForSPLFactory.createErc20ForSpl(TOKEN_MINT);
+            tx = await ERC20ForSPLFactory.createErc20ForSpl(TOKEN_MINT);
             await tx.wait(RECEIPTS_COUNT);
 
             const getErc20ForSpl = await ERC20ForSPLFactory.getErc20ForSpl(TOKEN_MINT);
 
-            ERC20ForSPL = ERC20ForSplContractFactory.attach(getErc20ForSpl);  */
+            ERC20ForSPL = ERC20ForSplContractFactory.attach(getErc20ForSpl);
             console.log('\nCreating instance of just now deployed ERC20ForSPL contract on Neon EVM with address', "\x1b[32m", ERC20ForSPL.target, "\x1b[30m", '\n');
         }
 
@@ -93,6 +79,7 @@ describe('Test init', async function () {
         console.log(await ERC20ForSPL.balanceOf(user3.address), 'user3');
 
         grantedTestersWithBalance = await ERC20ForSPL.balanceOf(owner.address) != 0 && await ERC20ForSPL.balanceOf(user1.address) != 0 && await ERC20ForSPL.balanceOf(user2.address) != 0;
+        console.log(grantedTestersWithBalance, 'grantedTestersWithBalance');
     });
 
     describe('ERC20ForSPL tests', function() {

@@ -6,8 +6,7 @@ const {
     ASSOCIATED_TOKEN_PROGRAM_ID,
     MINT_SIZE,
     createMintToInstruction,
-    createAssociatedTokenAccountInstruction,
-    createApproveInstruction
+    createAssociatedTokenAccountInstruction
 } = require('@solana/spl-token');
 const { Metaplex } = require("@metaplex-foundation/js");
 const bs58 = require("bs58");
@@ -72,8 +71,8 @@ async function init() {
             {
                 createMetadataAccountArgsV3: {
                     data: {
-                        name: "Neon EVM",
-                        symbol: "NEON",
+                        name: "Dev Neon EVM",
+                        symbol: "devNEON",
                         uri: 'https://ipfs.io/ipfs/QmW2JdmwWsTVLw1Gx4ympCn1VHJiuojfNLS5ZNLEPcBd5x/doge.json',
                         sellerFeeBasisPoints: 0,
                         collection: null,

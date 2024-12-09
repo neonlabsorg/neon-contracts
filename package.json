@@ -33,6 +33,8 @@
   },
   "dependencies": {
     "@metaplex-foundation/js": "^0.20.1",
+    "@neonevm/token-transfer-core": "^4.4.2",
+    "@neonevm/token-transfer-ethers": "^4.4.2",
     "@solana/spl-token": "^0.4.9",
     "@solana/web3.js": "^1.95.4"
   }
