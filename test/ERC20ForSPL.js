@@ -1,6 +1,10 @@
 const { ethers } = require("hardhat");
 const { expect } = require("chai");
 const web3 = require("@solana/web3.js");
+const {
+    getAssociatedTokenAddress,
+    getAccount
+} = require('@solana/spl-token');
 const { config } = require('./config');
 require("dotenv").config();
 
@@ -11,7 +15,6 @@ describe('Test init', async function () {
     const approverATAWithTokens = 'By6gUjV57cX99qpEx4QWuhpWiExGvUFkSxUQcbuMVPnb';
     let ERC20ForSPLFactory;
     let ERC20ForSPL;
-    let tokenMintAccount;
     let ownerSolanaPublicKey;
     let user1SolanaPublicKey;
     let user2SolanaPublicKey;
@@ -51,13 +54,12 @@ describe('Test init', async function () {
         }
 
         const TokenMintAccount = await ERC20ForSPL.tokenMint();
-        tokenMintAccount = ethers.encodeBase58(TokenMintAccount);
         ownerSolanaPublicKey = ethers.encodeBase58(await ERC20ForSPL.solanaAccount(owner.address));
         user1SolanaPublicKey = ethers.encodeBase58(await ERC20ForSPL.solanaAccount(user1.address));
         user2SolanaPublicKey = ethers.encodeBase58(await ERC20ForSPL.solanaAccount(user2.address));
         user3SolanaPublicKey = ethers.encodeBase58(await ERC20ForSPL.solanaAccount(user3.address));
         console.log('\nTokenMintAccount -', TokenMintAccount);
-        console.log('tokenMintAccount -', tokenMintAccount);
+        console.log('nTokenMintAccount -', ethers.encodeBase58(TokenMintAccount));
         console.log('\nOwner addresses:');
         console.log('Neon EVM address -', owner.address);
         console.log('Solana data account -', ownerSolanaPublicKey);
@@ -88,7 +90,7 @@ describe('Test init', async function () {
             }
         });
 
-        /* it('test claim & claimTo', async function () {
+        it('test claim & claimTo', async function () {
             if (approverATAWithTokens != '') {
                 const ownerBalance = await ERC20ForSPL.balanceOf(owner.address);
                 let tx = await ERC20ForSPL.connect(owner).claim(
@@ -314,14 +316,77 @@ describe('Test init', async function () {
             } else {
                 this.skip();
             }
-        }); */
+        });
 
-        // Solana native tests
-        it('validate SVM user balanceOf', async function () {
-            const keypair = new web3.PublicKey('8HzCjhBNP3rs7SydUrZAiQGEoqXHNtpNPE475zzHmzba');
-            const payer = ethers.dataSlice(ethers.keccak256(keypair.toBytes()), 12, 32);
+        // *********************************************************************************************************
+        // *************************************** Solana native tests *********************************************
+        // *********************************************************************************************************
+
+        it('validate Solana user balanceOf ( user with only ATA balance )', async function () {
+            const solanaUser = new web3.PublicKey('8HzCjhBNP3rs7SydUrZAiQGEoqXHNtpNPE475zzHmzba');
+            const payer = ethers.dataSlice(ethers.keccak256(solanaUser.toBytes()), 12, 32);
             console.log(payer, 'payer');
             console.log(await ERC20ForSPL.balanceOf(payer));
+
+            const solanaUserAta = await getAssociatedTokenAddress(
+                new web3.PublicKey(config.DATA.ADDRESSES.ERC20ForSplTokenMint),
+                solanaUser,
+                false
+            );
+            console.log(solanaUserAta, 'solanaUserAta');
+            const ataAccount = await getAccount(connection, solanaUserAta);
+            const ataBalance = (ataAccount.delegatedAmount > ataAccount.amount) ? ataAccount.amount : ataAccount.delegatedAmount;
+
+            expect(await ERC20ForSPL.balanceOf(payer)).to.be.greaterThan(0);
+            expect(await ERC20ForSPL.balanceOf(payer)).to.eq(ataBalance);
         });
+
+        it('validate Solana user balanceOf ( user with both PDA & ATA balances )', async function () {
+            const solanaUser = new web3.PublicKey('XYZ');
+            const payer = ethers.dataSlice(ethers.keccak256(solanaUser.toBytes()), 12, 32);
+            console.log(payer, 'payer');
+            console.log(await ERC20ForSPL.balanceOf(payer));
+
+            const solanaUserAta = await getAssociatedTokenAddress(
+                new web3.PublicKey(config.DATA.ADDRESSES.ERC20ForSplTokenMint),
+                solanaUser,
+                false
+            );
+            console.log(solanaUserAta, 'solanaUserAta');
+            const ataAccount = await getAccount(connection, solanaUserAta);
+            const ataBalance = (ataAccount.delegatedAmount > ataAccount.amount) ? ataAccount.amount : ataAccount.delegatedAmount;
+
+            const solanaUserPda = ethers.encodeBase58(await ERC20ForSPL.solanaAccount(payer));
+            console.log(solanaUserPda, 'solanaUserPda');
+
+            expect(await ERC20ForSPL.balanceOf(payer)).to.be.greaterThan(0);
+            expect(await ERC20ForSPL.balanceOf(payer)).to.eq(
+                ataBalance + (await getAccount(connection, solanaUserPda)).amount
+            );
+        });
+
+        it('transfer from Solana user with ATA balance to Neon user', async function () {
+
+        });
+
+        it('transfer from Solana user with PDA balance to Neon user', async function () {
+
+        });
+
+        it('transfer from Solana user with PDA & ATA balance to Neon user', async function () {
+            // validate that PDA tokens have been spent
+        });
+
+        it('transfer from Neon user to Solana user', async function () {
+            // validate that the tokens are being received to Solana user's ATA account
+        });
+
+        it('transfer from Solana user to Solana user', async function () {
+            // validate that the tokens are being received to Solana user's ATA account
+        });
+
+        // *********************************************************************************************************
+        // ************************************** /Solana native tests *********************************************
+        // *********************************************************************************************************
     });
 });
