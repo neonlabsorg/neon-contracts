@@ -23,6 +23,7 @@ describe('Test init', async function () {
     const TOKEN_MINT = config.utils.publicKeyToBytes32(config.DATA.ADDRESSES.ERC20ForSplTokenMint);
     const TOKEN_MINT_DECIMALS = 9;
     const RECEIPTS_COUNT = 3;
+    const connection = new web3.Connection(process.env.CURVESTAND_SOL, "processed");
 
     before(async function() {
         [owner, user1, user2, user3] = await ethers.getSigners();
