@@ -2,11 +2,10 @@ const { ethers } = require("hardhat");
 const { expect, assert } = require("chai");
 const web3 = require("@solana/web3.js");
 const {
-    createInitializeAccount2Instruction,
+    createAssociatedTokenAccountInstruction,
+    getAssociatedTokenAddress,
     createApproveInstruction,
-    getAccount,
-    TOKEN_PROGRAM_ID,
-    ACCOUNT_SIZE
+    getAccount
 } = require("@solana/spl-token");
 const { config } = require('./config');
 require("dotenv").config();
@@ -15,6 +14,37 @@ async function asyncTimeout(timeout) {
     return new Promise((resolve) => {
         setTimeout(() => resolve(), timeout);
     })
+}
+
+async function delegateSolana(params) {
+    // Get NeonEVM program Id
+    const neon_getEvmParams = await fetch(process.env.CURVESTAND, {
+        method: 'POST',
+        body: JSON.stringify({"method":"neon_getEvmParams","params":[],"id":1,"jsonrpc":"2.0"}),
+        headers: { 'Content-Type': 'application/json' }
+    });
+    const neonEVMProgramId = (await neon_getEvmParams.json()).result.neonEvmProgramId;
+
+    // Calculate delegate Ext Authority
+    const delegateAuthorityPublicKey = config.utils.calculatePdaAccount(
+        'AUTH',
+        params.ERC20ForSPLContractAddress,
+        params.delegateEVMAddress,
+        new web3.PublicKey(neonEVMProgramId)
+    )[0];
+    const solanaTx = new web3.Transaction();
+    solanaTx.add(
+        createApproveInstruction(
+            params.solanaApproverATA, // token account to be delegated
+            delegateAuthorityPublicKey, // delegate
+            params.solanaApprover.publicKey, // owner of token account to be delegated
+            params.amount // amount to be delegated
+        )
+    );
+    // let res = await web3.sendAndConfirmTransaction(connection, solanaTx, [payer, solanaApprover]);
+    // console.log(res)
+    web3.sendAndConfirmTransaction(params.connection, solanaTx, [params.solanaApprover]);
+    return delegateAuthorityPublicKey;
 }
 
 describe('Test init',  function () {
@@ -31,16 +61,18 @@ describe('Test init',  function () {
     const LARGE_AMOUNT =  ethers.parseUnits('1000', DECIMALS);
     const UINT64_MAX_AMOUNT =  ethers.toBigInt('18446744073709551615'); // 2**64 - 1
     const ZERO_ADDRESS = ethers.getAddress('0x0000000000000000000000000000000000000000');
-    const RECEIPTS_COUNT = 3;
+    const RECEIPTS_COUNT = 10;
+    const TIMEOUT = 10000;
+    const other  = ethers.Wallet.createRandom()
+    const other2 = ethers.Wallet.createRandom();
 
-    let owner, user1, user2, user3, other;
+    let owner, user1, user2, user3
     let ownerSolanaPublicKey;
-    let user1SolanaPublicKey;
+    let user1SolanaPublicKey, user1ExtAuthorityPublicKey;
     let user2SolanaPublicKey;
     let user3SolanaPublicKey;
-    let grantedTestersWithBalance, delegatedSolanaATA;
-    let payer, seed, minBalance;
-    let solanaApprover, solanaApproverATAInBytes, solanaApproverATA;
+    let grantedTestersWithBalance;
+    let solanaApprover, solanaApproverInBytes, solanaApproverATAInBytes, solanaApproverATA;
     let ERC20ForSPLFactory;
     let ERC20ForSPLMintable;
     let ERC20ForSPLFactoryAddress = '0xC16fbe59074595E56A4DB17f1350fCF83814D560';
@@ -53,7 +85,7 @@ describe('Test init',  function () {
         // ============================= DEPLOY CONTRACTS ====================================
 
         [owner, user1, user2, user3] = await ethers.getSigners();
-        other = ethers.Wallet.createRandom()
+
 
         const ERC20ForSPLMintableContractFactory = await ethers.getContractFactory(
             'contracts/token/ERC20ForSpl/erc20_for_spl.sol:ERC20ForSplMintable'
@@ -77,10 +109,11 @@ describe('Test init',  function () {
                 'contracts/token/ERC20ForSpl/erc20_for_spl_factory.sol:ERC20ForSplFactory'
             );
             await ERC20ForSPLFactory.waitForDeployment();
+            ERC20ForSPLFactoryAddress = ERC20ForSPLFactory.target;
             console.log(
                 '\nCreating instance of just now deployed ERC20ForSplFactory contract on Neon EVM with address',
                 "\x1b[33m",
-                ERC20ForSPLFactory.target,
+                ERC20ForSPLFactoryAddress,
                 "\x1b[0m",
                 '\n'
             );
@@ -106,10 +139,11 @@ describe('Test init',  function () {
                 ]
             );
             await ERC20ForSPLMintable.waitForDeployment();
+            ERC20ForSPLMintableAddress = ERC20ForSPLMintable.target;
             console.log(
                 '\nCreating instance of just now deployed ERC20ForSPLMintable contract on Neon EVM with address',
                 "\x1b[33m",
-                ERC20ForSPLMintable.target,
+                ERC20ForSPLMintableAddress,
                 "\x1b[0m",
                 '\n'
             );
@@ -153,38 +187,31 @@ describe('Test init',  function () {
 
                 // ==================== CREATE SOLANA APPROVER ACCOUNT, INITIALIZE ATA AND DELEGATE ====================
 
-                payer = web3.Keypair.fromSecretKey(
+                solanaApprover = web3.Keypair.fromSecretKey(
                     Buffer.from(ethers.decodeBase58(process.env.PRIVATE_KEY_SOLANA).toString(16), 'hex')
                 );
-                solanaApprover = web3.Keypair.generate();
-                seed = 'solanaApproverSeed';
-                solanaApproverATA = await web3.PublicKey.createWithSeed(solanaApprover.publicKey, seed, TOKEN_PROGRAM_ID);
+                solanaApproverInBytes = '0x' + ethers.decodeBase58(solanaApprover.publicKey.toBase58()).toString(16);
+
+                solanaApproverATA = await getAssociatedTokenAddress(
+                    new web3.PublicKey(ethers.encodeBase58(tokenMint)),
+                    solanaApprover.publicKey,
+                    false
+                );
                 solanaApproverATAInBytes = '0x' + ethers.decodeBase58(solanaApproverATA.toBase58()).toString(16);
-                minBalance = await connection.getMinimumBalanceForRentExemption(ACCOUNT_SIZE);
+
                 solanaTx = new web3.Transaction();
                 solanaTx.add(
-                    web3.SystemProgram.createAccountWithSeed({
-                        fromPubkey: payer.publicKey,
-                        basePubkey: solanaApprover.publicKey,
-                        newAccountPubkey: solanaApproverATA,
-                        seed: seed,
-                        lamports: minBalance,
-                        space: ACCOUNT_SIZE,
-                        programId: TOKEN_PROGRAM_ID
-                    })
-                );
-                solanaTx.add(
-                    createInitializeAccount2Instruction(
-                        solanaApproverATA,
-                        new web3.PublicKey(ethers.encodeBase58(tokenMint)),
+                   createAssociatedTokenAccountInstruction(
                         solanaApprover.publicKey,
+                        solanaApproverATA,
+                        solanaApprover.publicKey,
+                        new web3.PublicKey(ethers.encodeBase58(tokenMint))
                     )
-                );
-
+                )
                 // let res = await web3.sendAndConfirmTransaction(connection, solanaTx, [payer, solanaApprover]);
                 // console.log(res)
-                web3.sendAndConfirmTransaction(connection, solanaTx, [payer, solanaApprover]);
-                await asyncTimeout(1500);
+                web3.sendAndConfirmTransaction(connection, solanaTx, [solanaApprover]);
+                await asyncTimeout(TIMEOUT);
 
                 console.log('\nSolana approver addresses:');
                 console.log('Solana system account -', solanaApprover.publicKey.toBase58());
@@ -202,37 +229,6 @@ describe('Test init',  function () {
                 grantedTestersWithBalance = (await ERC20ForSPLMintable.balanceOf(owner.address)) >= LARGE_AMOUNT &&
                     (await ERC20ForSPLMintable.balanceOf(user1.address)) >= LARGE_AMOUNT &&
                     (await ERC20ForSPLMintable.balanceOf(user2.address)) >= LARGE_AMOUNT;
-
-                tx = await ERC20ForSPLMintable.connect(owner).transferSolana(solanaApproverATAInBytes, DOUBLE_AMOUNT);
-                await tx.wait(RECEIPTS_COUNT);
-
-                // let ata = await getAccount(connection, solanaApproverATA)
-                // console.log(ata, 'ata')
-
-                // ==================== DELEGATE SOLANA APPROVER ATA TO USER1 ==========================================
-
-                solanaTx = new web3.Transaction();
-                solanaTx.add(
-                    createApproveInstruction(
-                        solanaApproverATA, // token account to delegate
-                        new web3.PublicKey(user1SolanaPublicKey), // delegate
-                        solanaApprover.publicKey, // owner of token account to delegate
-                        DOUBLE_AMOUNT, // amount to delegate
-                    )
-                );
-
-                // let res = await web3.sendAndConfirmTransaction(connection, solanaTx, [payer, solanaApprover]);
-                // console.log(res)
-                web3.sendAndConfirmTransaction(connection, solanaTx, [payer, solanaApprover]);
-                await asyncTimeout(1500);
-                // ata = await getAccount(connection, solanaApproverATA)
-                // usr = await getAccount(connection, new web3.PublicKey(user1SolanaPublicKey))
-
-                // console.log(ata, 'ata')
-                // console.log(usr, 'usr')
-                delegatedSolanaATA =
-                    (await connection.getTokenAccountBalance(solanaApproverATA)).value.amount === DOUBLE_AMOUNT.toString() &&
-                    (await getAccount(connection, solanaApproverATA)).delegatedAmount === DOUBLE_AMOUNT;
             })
 
             it('Static ERC20 getter functions return values', async function () {
@@ -247,52 +243,329 @@ describe('Test init',  function () {
                     (await ERC20ForSPLMintable.balanceOf(user2.address)) +
                     (await ERC20ForSPLMintable.balanceOf(user3.address)) +
                     (await ERC20ForSPLMintable.balanceOf(other.address)) +
+                    (await ERC20ForSPLMintable.balanceOf(other2.address)) +
                     ethers.toBigInt((await connection.getTokenAccountBalance(solanaApproverATA)).value.amount);
                 expect(await ERC20ForSPLMintable.totalSupply()).to.eq(expectedSupply);
                 expect(await ERC20ForSPLMintable.balanceOf(user2.address)).to.eq(LARGE_AMOUNT);
                 expect(await ERC20ForSPLMintable.balanceOf(user3.address)).to.eq(ZERO_AMOUNT);
                 expect(await ERC20ForSPLMintable.allowance(user2.address, user1.address)).to.eq(ZERO_AMOUNT);
             });
+/*
+            it('getAccountDelegateData return value', async function () {
+                // Delegate user2 token account to user3
+                await ERC20ForSPLMintable.connect(user2).approveSolana(
+                    await ERC20ForSPLMintable.solanaAccount(user3.address),
+                    AMOUNT
+                );
+                let accountDelegateData = await ERC20ForSPLMintable.getAccountDelegateData(user3.address)
+                // console.log(accountDelegateData)
+                let accountDelegateData2 = await ERC20ForSPLMintable.getAccountDelegateData(user2.address)
+                // console.log(accountDelegateData2)
+                // DOES IT WORK ?
+                expect(accountDelegateData[0]).to.eq(
+                    await ERC20ForSPLMintable.solanaAccount(user3.address)
+                );
+                expect(accountDelegateData[1]).to.eq(AMOUNT);
+            });
+*/
+            it('solanaAccount return value', async function () {
+                // Calculate PDA off chain
+                const neon_getEvmParamsRequest = await fetch(process.env.CURVESTAND, {
+                    method: 'POST',
+                    body: JSON.stringify({"method":"neon_getEvmParams","params":[],"id":1,"jsonrpc":"2.0"}),
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                const neon_getEvmParams = await neon_getEvmParamsRequest.json();
+                const offChainPDAAccount = config.utils.calculatePdaAccount(
+                    'ContractData',
+                    ERC20ForSPLMintable.target,
+                    user1.address,
+                    new web3.PublicKey(neon_getEvmParams.result.neonEvmProgramId)
+                )[0].toBase58();
+
+                expect(ethers.encodeBase58(await ERC20ForSPLMintable.solanaAccount(user1.address))).to.eq(offChainPDAAccount)
+            });
+
             /*
-                    it('findMintAccount return value', async function () {
-                        expect(await ERC20ForSPLMintable.findMintAccount()).to.eq(
-                            // Figure out how to derive mint account
-                            "0xe79ad500832caf8f03e5d91a6f8ef45c71479e2b632a282e6fa2477162d664e4"
-                        );
-                    });
-            */
-            /*
-            it('test claim & claimTo', async function () {
-                if (delegatedSolanaATA) {
-
-                    tx = await ERC20ForSPLMintable.connect(owner).mint(user1.address, AMOUNT);
-                    await tx.wait(RECEIPTS_COUNT);
-
-                    let initialBalance = await ERC20ForSPLMintable.balanceOf(user1.address);
-
-                    tx = await ERC20ForSPLMintable.connect(user1).claim(
-                        solanaApproverATAInBytes,
-                        AMOUNT
-                    );
-                    await tx.wait(RECEIPTS_COUNT);
-
-                    expect(await ERC20ForSPLMintable.balanceOf(user1.address)).to.equal(initialBalance + AMOUNT);
-
-                    initialBalance = await ERC20ForSPL.balanceOf(user1.address);
-                    tx = await ERC20ForSPLMintable.connect(owner).claimTo(
-                        solanaApproverATAInBytes,
-                        user1.address,
-                        AMOUNT
-                    );
-                    await tx.wait(RECEIPTS_COUNT);
-
-                    expect(await ERC20ForSPLMintable.balanceOf(user1.address)).to.equal(initialBalance + AMOUNT);
-                } else {
-                    console.log('Empty solanaApproverATA - skipping test');
-                    this.skip();
-                }
+            it('findMintAccount return value', async function () {
+                expect(await ERC20ForSPLMintable.findMintAccount()).to.eq(
+                    // Figure out how to derive mint account
+                    "0xe79ad500832caf8f03e5d91a6f8ef45c71479e2b632a282e6fa2477162d664e4"
+                );
             });
             */
+
+            it('claim', async function () {
+                // Transfer AMOUNT to approver's ATA
+                tx = await ERC20ForSPLMintable.connect(owner).transferSolana(solanaApproverATAInBytes, AMOUNT);
+                await tx.wait(RECEIPTS_COUNT);
+
+                // Save initial approver and recipient balances
+                let initialApproverBalance = ethers.toBigInt(parseInt((
+                    await connection.getTokenAccountBalance(solanaApproverATA)
+                ).value.amount));
+                let initialRecipientBalance = await ERC20ForSPLMintable.balanceOf(user1.address);
+
+                // Approve recipient Ext Authority to claim AMOUNT
+                let delegateAuthorityPublicKey = await delegateSolana({
+                    connection,
+                    ERC20ForSPLContractAddress: ERC20ForSPLMintableAddress,
+                    delegateEVMAddress: user1.address,
+                    solanaApproverATA,
+                    solanaApprover,
+                    amount: AMOUNT
+                });
+                await asyncTimeout(TIMEOUT);
+
+                // Check approver's delegatedAmount and delegate
+                expect((await getAccount(connection, solanaApproverATA)).delegatedAmount).to.equal(AMOUNT);
+                expect((await getAccount(connection, solanaApproverATA)).delegate.toBase58()).to.equal(
+                    delegateAuthorityPublicKey.toBase58()
+                );
+
+                // Claim
+                tx = await ERC20ForSPLMintable.connect(user1).claim(
+                    solanaApproverATAInBytes,
+                    AMOUNT
+                );
+                await tx.wait(RECEIPTS_COUNT);
+
+                // Check balances after claim
+                expect(await ERC20ForSPLMintable.balanceOf(user1.address)).to.equal(
+                   initialRecipientBalance + AMOUNT
+                );
+                expect((await connection.getTokenAccountBalance(solanaApproverATA)).value.amount).to.equal(
+                    initialApproverBalance - AMOUNT
+                );
+
+                // Check approver's delegatedAmount and delegate after claim
+                expect((await getAccount(connection, solanaApproverATA)).delegatedAmount).to.equal(ZERO_AMOUNT);
+                expect((await getAccount(connection, solanaApproverATA)).delegate).to.be.null;
+            });
+
+            it('claimTo: recipient with balance (already initialized token account)', async function () {
+                // Transfer AMOUNT to approver's ATA
+                tx = await ERC20ForSPLMintable.connect(owner).transferSolana(solanaApproverATAInBytes, AMOUNT);
+                await tx.wait(RECEIPTS_COUNT);
+
+                // Save initial approver and recipient balances
+                let initialApproverBalance = ethers.toBigInt(parseInt((
+                    await connection.getTokenAccountBalance(solanaApproverATA)
+                ).value.amount));
+                let initialRecipientBalance = await ERC20ForSPLMintable.balanceOf(user2.address);
+
+                // Approve caller's Ext Authority to claim AMOUNT
+                let delegateAuthorityPublicKey = await delegateSolana({
+                    connection,
+                    ERC20ForSPLContractAddress: ERC20ForSPLMintableAddress,
+                    delegateEVMAddress: user1.address,
+                    solanaApproverATA,
+                    solanaApprover,
+                    amount: AMOUNT
+                });
+                await asyncTimeout(TIMEOUT);
+
+                // Check approver's delegatedAmount and delegate
+                expect((await getAccount(connection, solanaApproverATA)).delegatedAmount).to.equal(AMOUNT);
+                expect((await getAccount(connection, solanaApproverATA)).delegate.toBase58()).to.equal(
+                    delegateAuthorityPublicKey.toBase58()
+                );
+
+                // Claim
+                tx = await ERC20ForSPLMintable.connect(user1).claimTo(
+                    solanaApproverATAInBytes,
+                    user2.address,
+                    AMOUNT
+                );
+                await tx.wait(RECEIPTS_COUNT);
+
+                // Check balances after claim
+                expect(await ERC20ForSPLMintable.balanceOf(user2.address)).to.equal(
+                    initialRecipientBalance + AMOUNT
+                );
+                expect((await connection.getTokenAccountBalance(solanaApproverATA)).value.amount).to.equal(
+                    initialApproverBalance - AMOUNT
+                );
+
+                // Check approver's delegatedAmount and delegate after claim
+                expect((await getAccount(connection, solanaApproverATA)).delegatedAmount).to.equal(ZERO_AMOUNT);
+                expect((await getAccount(connection, solanaApproverATA)).delegate).to.be.null;
+            });
+
+            it('claimTo: new recipient (non-initialized token account)', async function () {
+                // Transfer AMOUNT to approver's ATA
+                tx = await ERC20ForSPLMintable.connect(owner).transferSolana(solanaApproverATAInBytes, AMOUNT);
+                await tx.wait(RECEIPTS_COUNT);
+
+                // Save initial approver and recipient balances
+                let initialApproverBalance = ethers.toBigInt(parseInt((
+                    await connection.getTokenAccountBalance(solanaApproverATA)
+                ).value.amount));
+                let initialRecipientBalance = await ERC20ForSPLMintable.balanceOf(other2.address);
+
+                // Approve caller's Ext Authority to claim AMOUNT
+                let delegateAuthorityPublicKey = await delegateSolana({
+                    connection,
+                    ERC20ForSPLContractAddress: ERC20ForSPLMintableAddress,
+                    delegateEVMAddress: user1.address,
+                    solanaApproverATA,
+                    solanaApprover,
+                    amount: AMOUNT
+                });
+                await asyncTimeout(TIMEOUT);
+
+                // Check approver's delegatedAmount and delegate
+                expect((await getAccount(connection, solanaApproverATA)).delegatedAmount).to.equal(AMOUNT);
+                expect((await getAccount(connection, solanaApproverATA)).delegate.toBase58()).to.equal(
+                    delegateAuthorityPublicKey.toBase58()
+                );
+
+                // Claim
+                tx = await ERC20ForSPLMintable.connect(user1).claimTo(
+                    solanaApproverATAInBytes,
+                    other2.address,
+                    AMOUNT
+                );
+                await tx.wait(RECEIPTS_COUNT);
+
+                // Check balances after claim
+                expect(await ERC20ForSPLMintable.balanceOf(other2.address)).to.equal(
+                    initialRecipientBalance + AMOUNT
+                );
+                expect((await connection.getTokenAccountBalance(solanaApproverATA)).value.amount).to.equal(
+                    initialApproverBalance - AMOUNT
+                );
+
+                // Check approver's delegatedAmount and delegate after claim
+                expect((await getAccount(connection, solanaApproverATA)).delegatedAmount).to.equal(ZERO_AMOUNT);
+                expect((await getAccount(connection, solanaApproverATA)).delegate).to.be.null;
+            });
+
+            it('Malicious claimTo (insufficient owner balance): reverts with error message', async function () {
+                // Transfer AMOUNT to approver's ATA
+                await ERC20ForSPLMintable.connect(owner).transferSolana(solanaApproverATAInBytes, AMOUNT);
+                await tx.wait(RECEIPTS_COUNT);
+
+                // Save initial approver and recipient balances
+                let initialApproverBalance = ethers.toBigInt(parseInt((
+                    await connection.getTokenAccountBalance(solanaApproverATA)
+                ).value.amount));
+                let initialRecipientBalance = await ERC20ForSPLMintable.balanceOf(user2.address);
+
+                // Set claimAmount to be greater than initialApproverBalance
+                const claimAmount =  ethers.toBigInt(initialApproverBalance) + AMOUNT;
+
+                // Approve caller's Ext Authority to claim claimAmount
+                let delegateAuthorityPublicKey = await delegateSolana({
+                    connection,
+                    ERC20ForSPLContractAddress: ERC20ForSPLMintableAddress,
+                    delegateEVMAddress: user1.address,
+                    solanaApproverATA,
+                    solanaApprover,
+                    amount: claimAmount
+                });
+                await asyncTimeout(TIMEOUT);
+
+                // Check approver's delegatedAmount and delegate
+                const delegatedAmount = (await getAccount(connection, solanaApproverATA)).delegatedAmount;
+                expect(delegatedAmount).to.equal(claimAmount);
+                expect((await getAccount(connection, solanaApproverATA)).delegate.toBase58()).to.equal(
+                    delegateAuthorityPublicKey.toBase58()
+                );
+
+                // Check that claim amount is greater than initialApproverBalance
+                expect(claimAmount).to.be.greaterThan(initialApproverBalance);
+                // Check that claim amount equals delegatedAmount
+                expect(claimAmount).to.eq(delegatedAmount);
+
+                // Claim
+                await expect(ERC20ForSPLMintable.connect(user1).claimTo(
+                    solanaApproverATAInBytes,
+                    user2.address,
+                    claimAmount
+                )).to.be.revertedWith('External call fails TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA: Error processing Instruction 0: custom program error: 0x1');
+
+                // Check balances after claim
+                expect(await ERC20ForSPLMintable.balanceOf(user2.address)).to.equal(
+                    initialRecipientBalance
+                );
+                expect((await connection.getTokenAccountBalance(solanaApproverATA)).value.amount).to.equal(
+                    initialApproverBalance
+                );
+
+                // Check approver's delegatedAmount and delegate after claim
+                expect((await getAccount(connection, solanaApproverATA)).delegatedAmount).to.equal(delegatedAmount);
+                expect((await getAccount(connection, solanaApproverATA)).delegate.toBase58()).to.equal(
+                    delegateAuthorityPublicKey.toBase58()
+                );
+            });
+
+            it('Malicious claimTo (insufficient allowance): reverts with error message', async function () {
+                // Approve caller's Ext Authority to claim AMOUNT
+                let delegateAuthorityPublicKey = await delegateSolana({
+                    connection,
+                    ERC20ForSPLContractAddress: ERC20ForSPLMintableAddress,
+                    delegateEVMAddress: user1.address,
+                    solanaApproverATA,
+                    solanaApprover,
+                    amount: AMOUNT
+                });
+                await asyncTimeout(TIMEOUT);
+
+                // Check approver's delegatedAmount and delegate
+                const delegatedAmount = (await getAccount(connection, solanaApproverATA)).delegatedAmount;
+                expect(delegatedAmount).to.equal(AMOUNT);
+                expect((await getAccount(connection, solanaApproverATA)).delegate.toBase58()).to.equal(
+                    delegateAuthorityPublicKey.toBase58()
+                );
+
+                // Set claimAmount to be greater than delegated amount
+                const claimAmount = delegatedAmount + AMOUNT;
+
+                // Transfer tokens to approver so that approver balance equals claimAmount
+                let initialApproverBalance = ethers.toBigInt(parseInt(
+                    (await connection.getTokenAccountBalance(solanaApproverATA)).value.amount
+                ));
+                if(initialApproverBalance < claimAmount) {
+                    await ERC20ForSPLMintable.connect(owner).transferSolana(
+                        solanaApproverATAInBytes,
+                        claimAmount - initialApproverBalance
+                    );
+                    await tx.wait(RECEIPTS_COUNT);
+                }
+                // Save initial approver and recipient balances
+                initialApproverBalance = ethers.toBigInt(parseInt(
+                    (await connection.getTokenAccountBalance(solanaApproverATA)).value.amount
+                ));
+                let initialRecipientBalance = await ERC20ForSPLMintable.balanceOf(user2.address);
+
+                // Check that claim amount is less than or equals approverBalance
+                expect(claimAmount).to.be.lessThanOrEqual(initialApproverBalance);
+                // Check that claim amount is greater than delegatedAmount
+                expect(claimAmount).to.be.greaterThan(delegatedAmount);
+
+                // Claim
+                await expect(ERC20ForSPLMintable.connect(user1).claimTo(
+                    solanaApproverATAInBytes,
+                    user2.address,
+                    claimAmount
+                )).to.be.revertedWith('External call fails TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA: Error processing Instruction 0: custom program error: 0x1');
+
+                // Check balances after claim
+                expect(await ERC20ForSPLMintable.balanceOf(user2.address)).to.equal(
+                    initialRecipientBalance
+                );
+                expect((await connection.getTokenAccountBalance(solanaApproverATA)).value.amount).to.equal(
+                    initialApproverBalance
+                );
+
+                // Check approver's delegatedAmount and delegate after claim
+                expect((await getAccount(connection, solanaApproverATA)).delegatedAmount).to.equal(delegatedAmount);
+                expect((await getAccount(connection, solanaApproverATA)).delegate.toBase58()).to.equal(
+                    delegateAuthorityPublicKey.toBase58()
+                );
+            });
+
             it('burn', async function () {
                 if (grantedTestersWithBalance) {
                     const initialBalance = await ERC20ForSPLMintable.balanceOf(user1.address);
@@ -449,6 +722,8 @@ describe('Test init',  function () {
                     'AmountExceedsUint64'
                 );
             });
+
+
         })
 
         it('mint: malicious mint reverts with InvalidOwner custom error', async function () {
