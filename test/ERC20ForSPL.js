@@ -84,6 +84,27 @@ describe('Test init', async function () {
     });
 
     describe('ERC20ForSPL tests', function() {
+        it('check PDA accounts calculation', async function () {
+            const neon_getEvmParamsRequest = await fetch(process.env.CURVESTAND, {
+                method: 'POST',
+                body: JSON.stringify({"method":"neon_getEvmParams","params":[],"id":1,"jsonrpc":"2.0"}),
+                headers: { 'Content-Type': 'application/json' }
+            });
+            const neon_getEvmParams = await neon_getEvmParamsRequest.json();
+
+            const pdaAccountOnChain = ethers.encodeBase58(await ERC20ForSPL.solanaAccount(owner.address));
+            const pdaAccountOffChain = config.utils.calculatePdaAccount(
+                'ContractData',
+                ERC20ForSPL.target,
+                owner.address,
+                new web3.PublicKey(neon_getEvmParams.result.neonEvmProgramId)
+            )[0].toBase58();
+            console.log(pdaAccountOnChain, 'pdaAccountOnChain');
+            console.log(pdaAccountOffChain, 'pdaAccountOffChain');
+
+            expect(pdaAccountOnChain).to.eq(pdaAccountOffChain);
+        });
+
         it('validate empty storage slots', async function () {
             for (let i = 0; i < 10; ++i) {
                 expect(await ethers.provider.getStorage(ERC20ForSPL.target, i)).to.eq('0x0000000000000000000000000000000000000000000000000000000000000000');
@@ -121,7 +142,7 @@ describe('Test init', async function () {
                 const ownerBalance = await ERC20ForSPL.balanceOf(owner.address);
                 const totalSupply = await ERC20ForSPL.totalSupply();
 
-                const burnAmount = ethers.parseUnits('10', TOKEN_MINT_DECIMALS);
+                const burnAmount = ethers.parseUnits('1', TOKEN_MINT_DECIMALS);
                 let tx = await ERC20ForSPL.connect(owner).burn(burnAmount);
                 await tx.wait(RECEIPTS_COUNT);
 
