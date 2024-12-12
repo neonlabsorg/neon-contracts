@@ -65,13 +65,15 @@ const config = {
             });
             const neonEVMProgramId = (await neon_getEvmParams.json()).result.neonEvmProgramId;
 
-            // Calculate delegate Ext Authority
+            // Calculate delegate's Ext Authority
             const delegateAuthorityPublicKey = this.calculatePdaAccount(
                 'AUTH',
                 params.ERC20ForSPLContractAddress,
                 params.delegateEVMAddress,
                 new params.web3.PublicKey(neonEVMProgramId)
             )[0];
+
+            // Approve delegate
             const solanaTx = new params.web3.Transaction();
             solanaTx.add(
                 createApproveInstruction(

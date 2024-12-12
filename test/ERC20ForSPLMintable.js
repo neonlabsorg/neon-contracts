@@ -10,9 +10,8 @@ const { config } = require('./config');
 require("dotenv").config();
 
 describe('Test init',  function () {
-    const SOLANA_NODE = process.env.CURVESTAND_SOL;
     const connection = new web3.Connection(
-        SOLANA_NODE,
+        process.env.CURVESTAND_SOL,
         "processed", //  See: https://solana-labs.github.io/solana-web3.js/v1.x/types/Commitment.html
         { confirmTransactionInitialTimeout: 0 } // See: https://solana-labs.github.io/solana-web3.js/v1.x/types/ConnectionConfig.html
     );
@@ -37,7 +36,7 @@ describe('Test init',  function () {
     let user2SolanaPublicKey;
     let user3SolanaPublicKey;
     let grantedTestersWithBalance;
-    let solanaApprover, solanaApproverInBytes, solanaApproverATAInBytes, solanaApproverATA;
+    let solanaApprover, solanaApproverATAInBytes, solanaApproverATA;
     let ERC20ForSPLFactory;
     let ERC20ForSPLMintable;
     let ERC20ForSPLFactoryAddress = '';
@@ -153,7 +152,6 @@ describe('Test init',  function () {
                 solanaApprover = web3.Keypair.fromSecretKey(
                     Buffer.from(ethers.decodeBase58(process.env.PRIVATE_KEY_SOLANA).toString(16), 'hex')
                 );
-                solanaApproverInBytes = '0x' + ethers.decodeBase58(solanaApprover.publicKey.toBase58()).toString(16);
 
                 solanaApproverATA = await getAssociatedTokenAddress(
                     new web3.PublicKey(ethers.encodeBase58(tokenMint)),

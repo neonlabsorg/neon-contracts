@@ -10,20 +10,34 @@ import {QueryAccount} from "../../precompiles/QueryAccount.sol";
 
 /// @title ERC20ForSplBackbone
 /// @author https://twitter.com/mnedelchev_
-/// @notice This contract serves as a backbone contract for both ERC20ForSpl and ERC20ForSplMintable smart contracts.
+/// @notice This contract serves as a backbone contract for both ERC20ForSpl and ERC20ForSplMintable smart contracts. It
+/// provides a standard ERC20 interface supplemented with SPL Token functions, allowing for NeonEVM users and dApps to
+/// interact with ERC20 tokens deployed on NeonEVM as well as native Solana SPL tokens.
 contract ERC20ForSplBackbone {
+    /// @dev Instance of NeonEVM's SPLTokenProgram precompiled smart contract
     ISPLTokenProgram public constant SPLTOKEN_PROGRAM = ISPLTokenProgram(0xFf00000000000000000000000000000000000004);
+    /// @dev Instance of NeonEVM's MetaplexProgram precompiled smart contract
     IMetaplexProgram public constant METAPLEX_PROGRAM = IMetaplexProgram(0xff00000000000000000000000000000000000005);
+    /// @dev Instance of NeonEVM's CallSolana precompiled smart contract
     ICallSolana public constant CALL_SOLANA = ICallSolana(0xFF00000000000000000000000000000000000006);
+    /// @dev Instance of NeonEVM's SolanaNative precompiled smart contract
     ISolanaNative public constant SOLANA_NATIVE = ISolanaNative(0xfF00000000000000000000000000000000000007);
-    bytes32 public constant TOKEN_PROGRAM = 0x06ddf6e1d765a193d9cbe146ceeb79ac1cb485ed5f5b37913a8cf5857eff00a9;
-    bytes32 public constant ASSOCIATED_TOKEN_PROGRAM = 0x8c97258f4e2489f1bb3d1029148e0d830b5a1399daff1084048e7bd8dbe9f859;
+    /// @dev Hex-encoding of Solana's base58-encoded Token program id TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA
+    bytes32 public constant TOKEN_PROGRAM_ID = 0x06ddf6e1d765a193d9cbe146ceeb79ac1cb485ed5f5b37913a8cf5857eff00a9;
+    /// @dev Hex-encoding of Solana's base58-encoded Associated Token program id ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL
+    bytes32 public constant ASSOCIATED_TOKEN_PROGRAM_ID = 0x8c97258f4e2489f1bb3d1029148e0d830b5a1399daff1084048e7bd8dbe9f859;
+    /// @dev Solana SPL Token address
     bytes32 immutable public tokenMint;
+    /// @dev ERC20 allowances mapping
     mapping(address => mapping(address => uint256)) private _allowances;
 
+    /// @dev ERC20 Transfer event
     event Transfer(address indexed from, address indexed to, uint256 amount);
+    /// @dev ERC20 Approval event
     event Approval(address indexed owner, address indexed spender, uint256 amount);
+    /// @dev Special event for SPL Token approval of a Solana account
     event ApprovalSolana(address indexed owner, bytes32 indexed spender, uint64 amount);
+    /// @dev Special event for SPL Token transfer to a Solana account
     event TransferSolana(address indexed from, bytes32 indexed to, uint64 amount);
 
     /// @notice Request to reading data from Solana account has failed.
@@ -34,35 +48,51 @@ contract ERC20ForSplBackbone {
     error InvalidAllowance();
     /// @notice Requested amount higher than the actual balance.
     error AmountExceedsBalance();
-    /// @notice The token mint on Solana has not metadata stored at the Metaplex program.
+    /// @notice The token mint on Solana has no metadata stored in the Metaplex program.
     error MissingMetaplex();
     /// @notice The token mint on Solana is invalid.
     error InvalidTokenMint();
     /// @notice Invalid token amount. 
     error AmountExceedsUint64();
 
-    /// @notice Returns the name of the SPLToken. The name value is stored in the Metaplex protocol.
+    /// @notice Token name getter function
+    /// @return The name of the SPLToken fetched from Solana's Metaplex program.
     function name() public view returns (string memory) {
         return METAPLEX_PROGRAM.name(tokenMint);
     }
 
-    /// @notice Returns the symbol of the SPLToken. The symbol value is stored in the Metaplex protocol.
+    /// @notice Token symbol getter function
+    /// @return The token symbol fetched from Solana's Metaplex program.
     function symbol() public view returns (string memory) {
         return METAPLEX_PROGRAM.symbol(tokenMint);
     }
 
-    /// @notice Returns the decimals of the SPLToken.
+    /// @notice Token decimals getter function
+    /// @return The token decimals fetched from Solana's SPL Token program.
     function decimals() public view returns (uint8) {
         return SPLTOKEN_PROGRAM.getMint(tokenMint).decimals;
     }
 
-    /// @notice Returns the totalSupply of the SPLToken.
+    /// @notice Token supply getter function
+    /// @return The token supply fetched from Solana's SPL Token program.
     function totalSupply() public view returns (uint256) {
         return SPLTOKEN_PROGRAM.getMint(tokenMint).supply;
     }
 
-    /// @notice Returns the SPLToken balance of an address.
-    /// @dev Unlike typical ERC20 the balances of ERC20ForSpl are actually stored on Solana, this standard doesn't include balances mapping. There is condition to check if the account is a Neon EVM user or Solana user - if the user is from Solana then his ATA balance is also included into the total balance calculation.
+    /// @notice Token balance getter function
+    /// @param account The NeonEVM address to get the balance of
+    /// @return The account's spendable token balance fetched from Solana's SPL Token program.
+    /// @dev While the ERC20 standard uses a mapping to store balances, Solana's SPL Token standard stores token
+    /// balances along with other token-related data on individual token accounts.
+    ///
+    /// NeonEVM uses an arbitrary token account on Solana (32 bytes address returned by the `solanaAccount(address)`
+    /// function) to store a user's token balance. We first fetch the token balance stored on this account.
+    ///
+    /// The SPL Token program uses an associated token account (ATA) derived from a user's native Solana account to store
+    /// a user's token balance. In the case where the `account` address refers to a native Solana account (32 bytes
+    /// address returned by the `SOLANA_NATIVE.solanaAddress(address)` function) we also fetch the token balance stored
+    /// in the associated token account (ATA) derived from this Solana account (32 bytes address returned by the
+    /// `getTokenMintATA(bytes32)` function.
     function balanceOf(address account) public view returns (uint256) {
         uint balance = SPLTOKEN_PROGRAM.getAccount(solanaAccount(account)).amount;
         bytes32 solanaAddress = SOLANA_NATIVE.solanaAddress(account);
@@ -77,12 +107,13 @@ contract ERC20ForSplBackbone {
         return balance;
     }
 
-    /// @notice Returns the allowances made to Ethereum-like addresses.
+    /// @notice Token ERC20 allowance getter function
+    /// @return The ERC20 allowance provided by the `owner` to the `spender`
     function allowance(address owner, address spender) public view returns (uint256) {
         return _allowances[owner][spender];
     }
 
-    /// @notice ERC20's approve method
+    /// @notice ERC20 approve function
     /// @custom:getter allowance
     function approve(address spender, uint256 amount) public returns (bool) {
         if (spender == address(0)) revert EmptyAddress();
@@ -90,14 +121,14 @@ contract ERC20ForSplBackbone {
         return true;
     }
 
-    /// @notice ERC20's transfer method
+    /// @notice ERC20 transfer function
     /// @custom:getter balanceOf
     function transfer(address to, uint256 amount) public returns (bool) {
         _transfer(msg.sender, to, amount);
         return true;
     }
 
-    /// @notice ERC20's transferFrom method. Before calling this method the from address has to approve the msg.sender to manage his tokens.
+    /// @notice ERC20 transferFrom function: spends the ERC20 allowance provided by the `from` account to `msg.sender`
     /// @custom:getter balanceOf
     function transferFrom(address from, address to, uint256 amount) public returns (bool) {
         if (from == address(0)) revert EmptyAddress();
@@ -106,8 +137,9 @@ contract ERC20ForSplBackbone {
         return true;
     }
 
-    /// @notice Custom method to handle direct transfers from EVM address to a Token account on Solana
-    /// @param to The Solana-like address in bytes32 of the receiver
+    /// @notice Custom ERC20ForSPL function: spends the ERC20 allowance provided by the `from` account to `msg.sender` by
+    /// transferring to a Solana SPL Token account
+    /// @param to The 32 bytes SPL Token account address of the recipient
     /// @custom:getter balanceOf
     function transferSolanaFrom(address from, bytes32 to, uint64 amount) public returns (bool) {
         if (from == address(0)) revert EmptyAddress();
@@ -115,14 +147,14 @@ contract ERC20ForSplBackbone {
         return _transferSolana(to, amount);
     }
 
-    /// @notice ERC20's burn method
+    /// @notice ERC20 burn function
     /// @custom:getter balanceOf
     function burn(uint256 amount) public returns (bool) {
         _burn(msg.sender, amount);
         return true;
     }
 
-    /// @notice ERC20's burnFrom method. Similar to transferFrom function, this method requires the from address to approve the msg.sender first, before calling burnFrom function
+    /// @notice ERC20 burnFrom function: spends the ERC20 allowance provided by the `from` account to `msg.sender`
     /// @custom:getter balanceOf
     function burnFrom(address from, uint256 amount) public returns (bool) {
         _spendAllowance(from, msg.sender, amount);
@@ -130,10 +162,14 @@ contract ERC20ForSplBackbone {
         return true;
     }
 
-    /// @notice ERC20ForSpl's approve method
-    /// @dev With ERC20ForSpl standard we can also make approvals on Solana-like addresses. These type of records are being stored directly on Solana and they're not being recorded inside the _allowances mapping.
-    /// @param spender The Solana-like address in bytes32 of the spender
-    /// @param amount The amount to be managed by the spender
+    /// @notice Custom ERC20ForSPL function: provides SPL Token delegation to a Solana SPL Token account.
+    /// @dev SPL Token delegation is similar to an ERC20 allowance but it is not stored in the ERC20 `_allowances`
+    /// mapping and can only be spent using the `claim` or `claimTo` functions.
+    ///
+    /// The SPL Token standard's concept of 'delegation' differs from ERC20 'allowances' in that it is only possible to
+    /// delegate to one single SPL Token account and subsequent delegations will erase previous delegations.
+    /// @param spender The delegate account, i.e. the Solana SPL Token account to be approved
+    /// @param amount The amount to be delegated to the delegate
     /// @custom:getter getAccountDelegateData
     function approveSolana(bytes32 spender, uint64 amount) public returns (bool) {
         bytes32 fromSolana = solanaAccount(msg.sender);
@@ -148,27 +184,31 @@ contract ERC20ForSplBackbone {
         return true;
     }
 
-    /// @notice ERC20ForSpl's transfer method
-    /// @dev With ERC20ForSpl standard we can also make transfers directly to Solana-like addresses. Balances data is being stored directly on Solana
-    /// @param to The Solana-like address in bytes32 of the receiver
-    /// @param amount The amount to be transfered to the receiver
+    /// @notice Custom ERC20ForSPL function: transfers to a Solana SPL Token account
+    /// @param to The 32 bytes SPL Token account address of the recipient
+    /// @param amount The amount to be transferred to the recipient
     /// @custom:getter balanceOf
     function transferSolana(bytes32 to, uint64 amount) public returns (bool) {
         return _transferSolana(to, amount);
     }
 
-    /// @notice Calling method claimTo with msg.sender to parameter
-    /// @param from The Solana-like address in bytes32 of the derived entity
-    /// @param amount The amount to be transferred out from the derived entity
+    /// @notice Custom ERC20ForSPL function: spends the SPL Token delegation provided to the NeonEVM arbitrary token
+    /// account attributed to `msg.sender` by the `from` Solana SPL Token account
+    /// @param from The 32 bytes SPL Token account address which provided delegation to the NeonEVM arbitrary token
+    /// account attributed to `msg.sender`
+    /// @param amount The amount to be transferred to the NeonEVM arbitrary token account attributed to `msg.sender`
     /// @custom:getter balanceOf
     function claim(bytes32 from, uint64 amount) external returns (bool) {
         return claimTo(from, msg.sender, amount);
     }
 
-    /// @notice Initiating transferWithSeed instuction on Solana. Before calling this method the derived address has to approve the method caller ( very similar to ERC20's transferFrom method )
-    /// @param from The Solana-like address in bytes32 of the derived entity
-    /// @param from The Ethereum-like address of the claimer
-    /// @param amount The amount to be transferred out from the derived entity
+    /// @notice Custom ERC20ForSPL function: spends the SPL Token delegation provided to the NeonEVM arbitrary token
+    /// account attributed to `msg.sender` by the `from` Solana SPL Token account and transfers to the NeonEVM
+    /// arbitrary token account attributed to the `to` address
+    /// @param from The 32 bytes SPL Token account address which provided delegation to the NeonEVM arbitrary token
+    /// account attributed to `msg.sender`
+    /// @param to The NeonEVM address of the recipient
+    /// @param amount The amount to be transferred to the NeonEVM arbitrary token account attributed to the `to` address
     /// @custom:getter balanceOf
     function claimTo(bytes32 from, address to, uint64 amount) public returns (bool) {
         bytes32 toSolana = solanaAccount(to);
@@ -182,13 +222,13 @@ contract ERC20ForSplBackbone {
         return true;
     }
 
-    /// @notice Internal method to keep records inside the _allowances mapping
+    /// @notice Internal function to update the `_allowances` mapping when a new ERC20 approval is provided
     function _approve(address owner, address spender, uint256 amount) internal {
         _allowances[owner][spender] = amount;
         emit Approval(owner, spender, amount);
     }
 
-    /// @notice Internal method to update the _allowances mapping on spending
+    /// @notice Internal function to update the `_allowances` mapping when an ERC20 allowance is spent
     function _spendAllowance(address owner, address spender, uint256 amount) internal {
         uint256 currentAllowance = _allowances[owner][spender];
         if (currentAllowance != type(uint256).max) {
@@ -197,7 +237,7 @@ contract ERC20ForSplBackbone {
         }
     }
 
-    /// @notice Internal method to burn amounts of the SPLToken on Solana
+    /// @notice Internal function to burn tokens
     function _burn(address from, uint256 amount) internal {
         if (from == address(0)) revert EmptyAddress();
         if (amount > type(uint64).max) revert AmountExceedsUint64();
@@ -209,7 +249,7 @@ contract ERC20ForSplBackbone {
         emit Transfer(from, address(0), amount);
     }
 
-    /// @notice Internal method to transfer amounts of the SPLToken on Solana to a EVM address
+    /// @notice Internal function to transfer tokens
     function _transfer(address from, address to, uint256 amount) internal {
         if (to == address(0)) revert EmptyAddress();
         if (amount > type(uint64).max) revert AmountExceedsUint64();
@@ -261,7 +301,7 @@ contract ERC20ForSplBackbone {
         emit Transfer(from, to, amount);
     }
 
-    /// @notice Internal method to transfer amounts of the SPLToken on Solana to a Token account
+    /// @notice Internal function to transfer tokens to a Solana SPL Token account
     function _transferSolana(bytes32 to, uint64 amount) internal returns (bool) {
         SPLTOKEN_PROGRAM.transfer(solanaAccount(msg.sender), to, uint64(amount));
 
@@ -270,45 +310,49 @@ contract ERC20ForSplBackbone {
         return true;
     }
 
-    /// @notice Returns the Solana-like address which is binded to the Ethereum-like address.
-    /// @dev When an address interacts for the first time with ERC20ForSpl under the hood there is Solana account creation which is binded to the Ethereum-like address used on Neon chain.
+    /// @notice Custom ERC20ForSPL getter function
+    /// @return The NeonEVM arbitrary token account attributed to the 'account` address
     function solanaAccount(address account) public pure returns (bytes32) {
         return SPLTOKEN_PROGRAM.findAccount(_salt(account));
     }
 
-    /// @notice Returns the allowances made to Solana-like addresses.
-    /// @dev Solana's architecture is a bit different compared to Ethereum and we can actually have only 1 delegate account at a time. Every new approval overwrites the previous one.
+    /// @notice Custom ERC20ForSPL getter function
+    /// @return The amount that was delegated to a delegate Solana SPL Token account by the NeonEVM arbitrary token
+    /// account attributed to the `account` address.
+    ///
+    /// Returned data corresponds to SPL Token delegation only and does not correspond to ERC20 allowances provided by
+    /// the `account` address.
     function getAccountDelegateData(address account) public view returns(bytes32, uint64) {
         ISPLTokenProgram.Account memory tokenAccount = SPLTOKEN_PROGRAM.getAccount(solanaAccount(account));
         return (tokenAccount.delegate, tokenAccount.delegated_amount);
     }
 
-    /// @notice Returns the tokenMint's ATA for given Solana account.
-    /// @param account Account on Solana in bytes32 format
+    /// @notice Custom ERC20ForSPL getter function
+    /// @return The SPL Token associated token account (ATA) address for this contract's `tokenMint` and provided Solana
+    /// account
+    /// @param account 32 bytes Solana account address
     function getTokenMintATA(bytes32 account) public view returns(bytes32) {
         return CALL_SOLANA.getSolanaPDA(
-            ASSOCIATED_TOKEN_PROGRAM,
+            ASSOCIATED_TOKEN_PROGRAM_ID,
             abi.encodePacked(
                 account,
-                TOKEN_PROGRAM,
+                TOKEN_PROGRAM_ID,
                 tokenMint
             )
         );
     }
 
-    /// @notice Converts an address to uint and then converts uint to bytes32.
-    /// @param account Account on Solana in bytes32 format
+    /// @return A 32 bytes salt used to derive the NeonEVM arbitrary token account attributed to the `account` address
     function _salt(address account) internal pure returns (bytes32) {
         return bytes32(uint256(uint160(account)));
     }
 }
 
-
 /// @title ERC20ForSpl
 /// @author https://twitter.com/mnedelchev_
-/// @notice This contract serves as an interface contract of already deployed SPLToken on Solana. Through this interface an Ethereum-like address on Neon EVM chain can apply changes on SPLToken account on Solana.
+/// @notice This contract serves as an interface to interact with already deployed, native SPL Token on Solana.
 contract ERC20ForSpl is ERC20ForSplBackbone {
-    /// @param _tokenMint The Solana-like address of the Token Mint on Solana
+    /// @param _tokenMint The 32 bytes Solana address of the underlying SPL Token
     constructor(bytes32 _tokenMint) {
         if (!SPLTOKEN_PROGRAM.getMint(_tokenMint).isInitialized) revert InvalidTokenMint();
         if (!METAPLEX_PROGRAM.isInitialized(_tokenMint)) revert MissingMetaplex();
@@ -317,16 +361,16 @@ contract ERC20ForSpl is ERC20ForSplBackbone {
     }
 }
 
-
 /// @title ERC20ForSplMintable
 /// @author https://twitter.com/mnedelchev_
-/// @notice This contract serves as an interface to the deployed SPLToken on Solana. Through this interface, Ethereum-like address on Neon EVM chain can apply changes on SPLToken account on Solana.
+/// @notice This contract deploys a new SPL Token on Solana and give its administrator permission to mint new tokens
 contract ERC20ForSplMintable is ERC20ForSplBackbone {
     address immutable _admin;
 
-    /// @param _name The name of the SPLToken
-    /// @param _symbol The symbol of the SPLToken
-    /// @param _decimals The decimals of the SPLToken. This value cannot be bigger than 9, because of Solana's maximum value limit of uint64
+    /// @param _name The name of the SPL Token to be deployed
+    /// @param _symbol The symbol of the SPL Token  to be deployed
+    /// @param _decimals The decimals of the SPL Token to be deployed. This value cannot be bigger than 9 because of
+    /// Solana's maximum value limit of uint64
     /// @param _owner The owner of the ERC20ForSplMintable contract which has the permissions to mint new tokens
     constructor(
         string memory _name,
@@ -346,12 +390,12 @@ contract ERC20ForSplMintable is ERC20ForSplBackbone {
     /// @notice Unauthorized msg.sender.
     error InvalidOwner();
 
-    /// @notice Returns the Solana address of the Token Mint
+    /// @return The 32 bytes Solana address of the underlying SPL Token
     function findMintAccount() public pure returns (bytes32) {
         return SPLTOKEN_PROGRAM.findAccount(bytes32(0));
     }
 
-    /// @notice Mint new SPLToken directly on Solana chain
+    /// @notice Mints new tokens to the NeonEVM arbitrary token account attributed to the 'to` address.
     /// @custom:getter balanceOf
     function mint(address to, uint256 amount) public {
         if (msg.sender != _admin) revert InvalidOwner();

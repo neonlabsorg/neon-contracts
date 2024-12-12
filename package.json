@@ -36,6 +36,7 @@
     "@neonevm/token-transfer-core": "^4.4.2",
     "@neonevm/token-transfer-ethers": "^4.4.2",
     "@solana/spl-token": "^0.4.9",
-    "@solana/web3.js": "^1.95.4"
+    "@solana/web3.js": "^1.95.4",
+    "solidity-docgen": "^0.6.0-beta.36"
   }
 }
