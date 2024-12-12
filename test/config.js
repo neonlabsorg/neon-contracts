@@ -1,4 +1,5 @@
 const web3 = require("@solana/web3.js");
+const {createApproveInstruction} = require("@solana/spl-token");
 
 const config = {
     DATA: {
@@ -35,6 +36,9 @@ const config = {
         
             return web3.PublicKey.findProgramAddressSync(seed, neonEvmProgram);
         },
+        calculateATAAccount: function (prefix, tokenEvmAddress, salt, neonEvmProgram) {
+
+        },
         isValidHex: function(hex) {
             const isHexStrict = /^(0x)?[0-9a-f]*$/i.test(hex.toString());
             if (!isHexStrict) {
@@ -46,6 +50,41 @@ const config = {
         toFixed: function(num, fixed) {
             let re = new RegExp('^-?\\d+(?:\.\\d{0,' + (fixed || -1) + '})?');
             return num.toString().match(re)[0];
+        },
+        asyncTimeout: async function(timeout) {
+            return new Promise((resolve) => {
+                setTimeout(() => resolve(), timeout);
+            })
+        },
+        delegateSolana: async function delegateSolana(params) {
+            // Get NeonEVM program Id
+            const neon_getEvmParams = await fetch(params.curvestand, {
+                method: 'POST',
+                body: JSON.stringify({"method":"neon_getEvmParams","params":[],"id":1,"jsonrpc":"2.0"}),
+                headers: { 'Content-Type': 'application/json' }
+            });
+            const neonEVMProgramId = (await neon_getEvmParams.json()).result.neonEvmProgramId;
+
+            // Calculate delegate Ext Authority
+            const delegateAuthorityPublicKey = this.calculatePdaAccount(
+                'AUTH',
+                params.ERC20ForSPLContractAddress,
+                params.delegateEVMAddress,
+                new params.web3.PublicKey(neonEVMProgramId)
+            )[0];
+            const solanaTx = new params.web3.Transaction();
+            solanaTx.add(
+                createApproveInstruction(
+                    params.solanaApproverATA, // token account to be delegated
+                    delegateAuthorityPublicKey, // delegate
+                    params.solanaApprover.publicKey, // owner of token account to be delegated
+                    params.amount // amount to be delegated
+                )
+            );
+            // let res = await web3.sendAndConfirmTransaction(connection, solanaTx, [payer, solanaApprover]);
+            // console.log(res)
+            params.web3.sendAndConfirmTransaction(params.connection, solanaTx, [params.solanaApprover]);
+            return delegateAuthorityPublicKey;
         }
     },
 };
