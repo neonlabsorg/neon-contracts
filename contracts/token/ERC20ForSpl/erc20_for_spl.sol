@@ -11,8 +11,9 @@ import {QueryAccount} from "../../precompiles/QueryAccount.sol";
 /// @title ERC20ForSplBackbone
 /// @author https://twitter.com/mnedelchev_
 /// @notice This contract serves as a backbone contract for both ERC20ForSpl and ERC20ForSplMintable smart contracts. It
-/// provides a standard ERC20 interface supplemented with SPL Token functions, allowing for NeonEVM users and dApps to
-/// interact with ERC20 tokens deployed on NeonEVM as well as native Solana SPL tokens.
+/// provides a standard ERC20 interface supplemented with custom functions and variables providing compatibility with
+/// Solana's SPL Token. This allows NeonEVM users and dApps to interact with ERC20 tokens deployed on NeonEVM as well as
+/// native Solana SPL tokens.
 contract ERC20ForSplBackbone {
     /// @dev Instance of NeonEVM's SPLTokenProgram precompiled smart contract
     ISPLTokenProgram public constant SPLTOKEN_PROGRAM = ISPLTokenProgram(0xFf00000000000000000000000000000000000004);
@@ -168,7 +169,7 @@ contract ERC20ForSplBackbone {
     ///
     /// The SPL Token standard's concept of 'delegation' differs from ERC20 'allowances' in that it is only possible to
     /// delegate to one single SPL Token account and subsequent delegations will erase previous delegations.
-    /// @param spender The delegate account, i.e. the Solana SPL Token account to be approved
+    /// @param spender The 32 bytes address of the delegate account, i.e. the Solana SPL Token account to be approved
     /// @param amount The amount to be delegated to the delegate
     /// @custom:getter getAccountDelegateData
     function approveSolana(bytes32 spender, uint64 amount) public returns (bool) {
@@ -192,8 +193,8 @@ contract ERC20ForSplBackbone {
         return _transferSolana(to, amount);
     }
 
-    /// @notice Custom ERC20ForSPL function: spends the SPL Token delegation provided to the NeonEVM arbitrary token
-    /// account attributed to `msg.sender` by the `from` Solana SPL Token account
+    /// @notice Custom ERC20ForSPL function: spends the SPL Token delegation provided by the `from` Solana SPL Token
+    /// account to the NeonEVM arbitrary token account attributed to `msg.sender`
     /// @param from The 32 bytes SPL Token account address which provided delegation to the NeonEVM arbitrary token
     /// account attributed to `msg.sender`
     /// @param amount The amount to be transferred to the NeonEVM arbitrary token account attributed to `msg.sender`
@@ -202,8 +203,8 @@ contract ERC20ForSplBackbone {
         return claimTo(from, msg.sender, amount);
     }
 
-    /// @notice Custom ERC20ForSPL function: spends the SPL Token delegation provided to the NeonEVM arbitrary token
-    /// account attributed to `msg.sender` by the `from` Solana SPL Token account and transfers to the NeonEVM
+    /// @notice Custom ERC20ForSPL function: spends the SPL Token delegation provided by the `from` Solana SPL Token
+    /// account to the NeonEVM arbitrary token account attributed to `msg.sender` and transfers to the NeonEVM
     /// arbitrary token account attributed to the `to` address
     /// @param from The 32 bytes SPL Token account address which provided delegation to the NeonEVM arbitrary token
     /// account attributed to `msg.sender`
@@ -317,10 +318,10 @@ contract ERC20ForSplBackbone {
     }
 
     /// @notice Custom ERC20ForSPL getter function
-    /// @return The amount that was delegated to a delegate Solana SPL Token account by the NeonEVM arbitrary token
-    /// account attributed to the `account` address.
+    /// @return The 32 bytes Solana SPL Token account address of the delegate and the amount that was delegated to that
+    // delegate  by the NeonEVM arbitrary token account attributed to the `account` address.
     ///
-    /// Returned data corresponds to SPL Token delegation only and does not correspond to ERC20 allowances provided by
+    /// Returned data corresponds to SPL Token delegation only and does not include any ERC20 allowances provided by
     /// the `account` address.
     function getAccountDelegateData(address account) public view returns(bytes32, uint64) {
         ISPLTokenProgram.Account memory tokenAccount = SPLTOKEN_PROGRAM.getAccount(solanaAccount(account));
@@ -329,7 +330,7 @@ contract ERC20ForSplBackbone {
 
     /// @notice Custom ERC20ForSPL getter function
     /// @return The SPL Token associated token account (ATA) address for this contract's `tokenMint` and provided Solana
-    /// account
+    /// account address
     /// @param account 32 bytes Solana account address
     function getTokenMintATA(bytes32 account) public view returns(bytes32) {
         return CALL_SOLANA.getSolanaPDA(
