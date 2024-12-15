@@ -4,9 +4,9 @@ const {createApproveInstruction} = require("@solana/spl-token");
 const config = {
     DATA: {
         ADDRESSES: {
-            ERC20ForSplFactory: '0x40e33C96bd3ffcD4E3ee2c67b3A750D46282EF2E',
-            ERC20ForSpl: '0x4914ddea410894Fe3789ACeb70Ac6b2c85117d86',
-            ERC20ForSplTokenMint: 'Fq29HDC7MUAu8sUAqFdjPtdCcVVSitvK1wezy7gMpNE3'
+            ERC20ForSplFactory: '0xDb08ab137309D7b8b27eEEdFabaBee4fA03d2b3d',
+            ERC20ForSpl: '0xb76f17F963dE1131D80bB77cc0FEc2089F2E231C',
+            ERC20ForSplTokenMint: 'J7bBsYHHEadYxWnFy11xL2qvvsmkd5rGML97ByPEuX4k'
         }
     },
     utils: {
@@ -35,9 +35,6 @@ const config = {
             }
         
             return web3.PublicKey.findProgramAddressSync(seed, neonEvmProgram);
-        },
-        calculateATAAccount: function (prefix, tokenEvmAddress, salt, neonEvmProgram) {
-
         },
         isValidHex: function(hex) {
             const isHexStrict = /^(0x)?[0-9a-f]*$/i.test(hex.toString());
@@ -87,6 +84,130 @@ const config = {
             // console.log(res)
             params.web3.sendAndConfirmTransaction(params.connection, solanaTx, [params.solanaApprover]);
             return delegateAuthorityPublicKey;
+        },
+        SolanaNativeHelper: {
+            getPayer(svmKeypair) {
+                return ethers.dataSlice(ethers.keccak256(svmKeypair.publicKey.toBytes()), 12, 32)
+            },
+            hexToBuffer: function(hex) {
+                const _hex = config.utils.isValidHex(hex) ? hex.replace(/^0x/i, '') : hex;
+                return Buffer.from(_hex, 'hex');
+            },
+            numberToBuffer: function(size) {
+                return Buffer.from([size]);
+            },
+            stringToBuffer: function(str, encoding = 'utf8') {
+                return Buffer.from(str, encoding);
+            },
+            toBytesLittleEndian: function(num, byteLength) {
+                const buffer = Buffer.alloc(byteLength);
+                buffer.writeBigUInt64LE(BigInt(num), 0);
+                return buffer;
+            },
+            toU256BE: function(bigIntNumber) {
+                if (bigIntNumber < BigInt(0) || bigIntNumber > BigInt('0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF')) {
+                    throw new Error('Number out of range for U256BE');
+                }
+            
+                const buffer = new ArrayBuffer(32); // 256 bits = 32 bytes
+                const view = new DataView(buffer);
+            
+                // Loop through each byte and set it from the start to maintain big-endian order
+                for (let i = 0; i < 32; i++) {
+                    // Extract each byte of the BigInt number
+                    const byte = Number((bigIntNumber >> BigInt(8 * (31 - i))) & BigInt(0xFF));
+                    view.setUint8(i, byte);
+                }
+                return new Uint8Array(buffer);
+            },
+            toBytesInt32: function(number, littleEndian = true) {
+                const arrayBuffer = new ArrayBuffer(4); // an Int32 takes 4 bytes
+                const dataView = new DataView(arrayBuffer);
+                dataView.setUint32(0, number, littleEndian); // byteOffset = 0; litteEndian = false
+                return arrayBuffer;
+            },
+            neonBalanceProgramAddressSync: function(neonWallet, neonEvmProgram, chainId) {
+                const neonWalletBuffer = config.utils.SolanaNativeHelper.hexToBuffer(neonWallet);
+                const chainIdBytes = config.utils.SolanaNativeHelper.toU256BE(BigInt(chainId)); //chain_id as u256be
+                const seed = [config.utils.SolanaNativeHelper.numberToBuffer(0x03), neonWalletBuffer, chainIdBytes];
+                return web3.PublicKey.findProgramAddressSync(seed, neonEvmProgram);
+            },
+            neonTreeAccountAddressSync: function(neonWallet, neonEvmProgram, chainId, nonce) {
+                const version = config.utils.SolanaNativeHelper.numberToBuffer(0x03);
+                const tag = config.utils.SolanaNativeHelper.stringToBuffer('TREE');
+                const address = config.utils.SolanaNativeHelper.hexToBuffer(neonWallet);
+                const _chainId = config.utils.SolanaNativeHelper.toBytesLittleEndian(chainId, 8);
+                const _nonce = config.utils.SolanaNativeHelper.toBytesLittleEndian(nonce, 8);
+                const seed = [version, tag, address, _chainId, _nonce];
+                return web3.PublicKey.findProgramAddressSync(seed, neonEvmProgram);
+            },
+            neonAuthorityPoolAddressSync: function(neonEvmProgram) {
+                const seed = [config.utils.SolanaNativeHelper.stringToBuffer('Deposit')];
+                return web3.PublicKey.findProgramAddressSync(seed, neonEvmProgram);
+            },
+            treasuryPoolAddressSync: function(neonEvmProgram, treasuryPoolIndex) {
+                const a = config.utils.SolanaNativeHelper.stringToBuffer('treasury_pool');
+                const b = Buffer.from(config.utils.SolanaNativeHelper.toBytesInt32(treasuryPoolIndex));
+                return web3.PublicKey.findProgramAddressSync([a, b], neonEvmProgram);
+            },
+            createScheduledTransactionInstruction: async function(node, instructionData) {
+                const {
+                    neonEvmProgram: programId,
+                    signerAddress,
+                    balanceAddress,
+                    treeAccountAddress,
+                    associatedTokenAddress,
+                    treasuryPool,
+                    neonTransaction
+                } = instructionData;
+
+                // airdrop SOLs to treasury
+                const airdropSolsRequest = await fetch(node, {
+                    method: 'POST',
+                    body: JSON.stringify({"jsonrpc":"2.0", "id":1, "method":"requestAirdrop", "params": [treasuryPool.publicKey.toBase58(), 1000000000]}),
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                const airdropSolsResponse = await airdropSolsRequest.json();
+              
+                const keys = [
+                    { pubkey: signerAddress, isSigner: true, isWritable: true },
+                    { pubkey: balanceAddress, isSigner: false, isWritable: true },
+                    { pubkey: treasuryPool.publicKey, isSigner: false, isWritable: true },
+                    { pubkey: treeAccountAddress, isSigner: false, isWritable: true },
+                    { pubkey: associatedTokenAddress, isSigner: false, isWritable: true },
+                    { pubkey: web3.SystemProgram.programId, isSigner: false, isWritable: false }
+                ];
+                const type = config.utils.SolanaNativeHelper.numberToBuffer(0x4A);
+                const count = Buffer.from(config.utils.SolanaNativeHelper.toBytesInt32(treasuryPool.index));
+                const transaction = config.utils.SolanaNativeHelper.hexToBuffer(neonTransaction);
+                return new web3.TransactionInstruction({ 
+                    keys, 
+                    programId, 
+                    data: Buffer.concat(
+                        [type, count, transaction]
+                    )
+                });
+            }
+        },
+        airdropNEON: async function(address) {
+            const postRequestNeons = await fetch(process.env.CURVESTAND_FAUCET, {
+                method: 'POST',
+                body: JSON.stringify({"amount": 1000, "wallet": address}),
+                headers: { 'Content-Type': 'application/json' }
+            });
+            console.log('Airdrop NEONs to', address);
+
+            await config.utils.asyncTimeout(1000);
+        },
+        airdropSOL: async function(account) {
+            let postRequest = await fetch(process.env.CURVESTAND_SOL, {
+                method: 'POST',
+                body: JSON.stringify({"jsonrpc":"2.0", "id":1, "method":"requestAirdrop", "params": [account.publicKey.toBase58(), 1000000000]}),
+                headers: { 'Content-Type': 'application/json' }
+            });
+            console.log('Airdrop SOLs to', account.publicKey.toBase58());
+
+            await config.utils.asyncTimeout(1000);
         }
     },
 };

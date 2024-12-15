@@ -23,6 +23,8 @@ contract ERC20ForSplBackbone {
     ICallSolana public constant CALL_SOLANA = ICallSolana(0xFF00000000000000000000000000000000000006);
     /// @dev Instance of NeonEVM's SolanaNative precompiled smart contract
     ISolanaNative public constant SOLANA_NATIVE = ISolanaNative(0xfF00000000000000000000000000000000000007);
+    /// @dev Hex-encoding of Solana's base58-encoded Program id 53DfF883gyixYNXnM7s5xhdeyV8mVk9T4i2hGV9vG9io
+    bytes32 public constant NEON_EVM_PROGRAM = 0x3c00392b787d38a853d124057634c43c7133c612461d74feb17f4248155286c0;
     /// @dev Hex-encoding of Solana's base58-encoded Token program id TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA
     bytes32 public constant TOKEN_PROGRAM_ID = 0x06ddf6e1d765a193d9cbe146ceeb79ac1cb485ed5f5b37913a8cf5857eff00a9;
     /// @dev Hex-encoding of Solana's base58-encoded Associated Token program id ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL
@@ -102,7 +104,9 @@ contract ERC20ForSplBackbone {
             bytes32 tokenMintATA = getTokenMintATA(solanaAddress);
             if (!SPLTOKEN_PROGRAM.isSystemAccount(tokenMintATA)) {
                 ISPLTokenProgram.Account memory tokenMintATAData = SPLTOKEN_PROGRAM.getAccount(tokenMintATA);
-                balance+= (tokenMintATAData.delegated_amount > tokenMintATAData.amount) ? tokenMintATAData.amount : tokenMintATAData.delegated_amount;
+                if (tokenMintATAData.delegate == getUserExtAuthority(account)) {
+                    balance+= (tokenMintATAData.delegated_amount > tokenMintATAData.amount) ? tokenMintATAData.amount : tokenMintATAData.delegated_amount;
+                }
             }
         }
         return balance;
@@ -263,7 +267,9 @@ contract ERC20ForSplBackbone {
             fromSolanaATA = getTokenMintATA(fromSolanaAccount);
             if (!SPLTOKEN_PROGRAM.isSystemAccount(fromSolanaATA)) {
                 ISPLTokenProgram.Account memory tokenMintATAData = SPLTOKEN_PROGRAM.getAccount(fromSolanaATA);
-                availableATABalance+= (tokenMintATAData.delegated_amount > tokenMintATAData.amount) ? tokenMintATAData.amount : tokenMintATAData.delegated_amount;
+                if (tokenMintATAData.delegate == getUserExtAuthority(from)) {
+                    availableATABalance+= (tokenMintATAData.delegated_amount > tokenMintATAData.amount) ? tokenMintATAData.amount : tokenMintATAData.delegated_amount;
+                }
             }
         }
 
@@ -296,7 +302,7 @@ contract ERC20ForSplBackbone {
         }
 
         if (amountFromATA != 0) {
-            SPLTOKEN_PROGRAM.transfer(fromSolanaATA, toSolana, amountFromATA);
+            SPLTOKEN_PROGRAM.transferWithSeed(_salt(from), fromSolanaATA, toSolana, amountFromATA);
         }
 
         emit Transfer(from, to, amount);
@@ -339,6 +345,20 @@ contract ERC20ForSplBackbone {
                 account,
                 TOKEN_PROGRAM_ID,
                 tokenMint
+            )
+        );
+    }
+
+    /// @notice Custom ERC20ForSPL getter function
+    /// @return A solana account which can be used as external authority to spend approvals from Solana to Neon
+    function getUserExtAuthority(address account) public view returns(bytes32) {
+        return CALL_SOLANA.getSolanaPDA(
+            NEON_EVM_PROGRAM,
+            abi.encodePacked(
+                hex"03",
+                hex"41555448", // AUTH
+                address(this),
+                _salt(account)
             )
         );
     }

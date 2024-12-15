@@ -20,6 +20,11 @@ const keypair = web3.Keypair.fromSecretKey(
 );
 console.log(keypair.publicKey.toBase58(), 'publicKey');
 
+const keypair2 = web3.Keypair.fromSecretKey(
+    bs58.decode(process.env.PRIVATE_KEY_SOLANA_2)
+);
+console.log(keypair2.publicKey.toBase58(), 'publicKey');
+
 async function init() {
     const seed = 'seed' + Date.now().toString(); // random seed on each script call
     const createWithSeed = await web3.PublicKey.createWithSeed(keypair.publicKey, seed, new web3.PublicKey(TOKEN_PROGRAM_ID));
@@ -31,6 +36,13 @@ async function init() {
         false
     );
     console.log(keypairAta, 'keypairAta');
+
+    let keypairAta2 = await getAssociatedTokenAddress(
+        createWithSeed,
+        keypair2.publicKey,
+        false
+    );
+    console.log(keypairAta2, 'keypairAta2');
 
     const minBalance = await connection.getMinimumBalanceForRentExemption(MINT_SIZE);
 
@@ -98,9 +110,29 @@ async function init() {
     );
 
     tx.add(
+        createAssociatedTokenAccountInstruction(
+            keypair.publicKey,
+            keypairAta2,
+            keypair2.publicKey,
+            createWithSeed,
+            TOKEN_PROGRAM_ID, 
+            ASSOCIATED_TOKEN_PROGRAM_ID
+        )
+    );
+
+    tx.add(
         createMintToInstruction(
             createWithSeed,
             keypairAta,
+            keypair.publicKey,
+            1230 * 10 ** 9 // mint 1000 tokens
+        )
+    );
+
+    tx.add(
+        createMintToInstruction(
+            createWithSeed,
+            keypairAta2,
             keypair.publicKey,
             1230 * 10 ** 9 // mint 1000 tokens
         )

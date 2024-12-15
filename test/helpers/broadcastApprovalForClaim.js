@@ -17,7 +17,7 @@ console.log(keypair.publicKey.toBase58(), 'publicKey');
 async function init() {
     const tokenMint = new web3.PublicKey(config.DATA.ADDRESSES.ERC20ForSplTokenMint);
     const ERC20ForSPL = config.DATA.ADDRESSES.ERC20ForSpl;
-    const userAddress = '0xAB1c34b53F12980a4fa9043B70c864CEE6891c0C';
+    const userAddress = '0x029158417ee0da19f0561e09302429fb9ebf1af7';
 
     const neon_getEvmParamsRequest = await fetch(process.env.CURVESTAND, {
         method: 'POST',
@@ -31,8 +31,6 @@ async function init() {
         keypair.publicKey,
         false
     );
-    console.log(keypairTokenAta, 'keypairTokenAta');
-    return;
 
     const delegatedPda = config.utils.calculatePdaAccount(
         'AUTH',
