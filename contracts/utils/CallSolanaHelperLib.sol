@@ -28,16 +28,22 @@ library CallSolanaHelperLib {
 
             // define the instructionData length
             let instructionDataLen := mload(instructionData)
-            
-            // define the total output bytes length
-            let dataLength := add(instructionDataLen, add(32, add(8, add(8, mul(accountsLen, 34)))))
 
+             // define the total output bytes length
+                // first 32 bytes are the Solana programId
+                // next 8 bytes are defining the length of the accounts list
+                // next x bytes are the account list
+                // next 8 bytes are defining the length of the Solana instruction data
+                // next x bytes are the instruction data
+            let dataLength := add(32, add(8, add(mul(accountsLen, 34), add(8, instructionDataLen))))
+            
             // set the new free memory pointer to accommodate the new bytes variable
             mstore(0x40, add(programIdAndAccounts, add(dataLength, 0x20)))
 
             // store dataLength ( the total output bytes length )
             mstore(programIdAndAccounts, dataLength)
 
+            // define the pointer for first data to be stored
             let dataPtr := add(programIdAndAccounts, 0x20)
 
             // store programId
@@ -50,9 +56,10 @@ library CallSolanaHelperLib {
             
             // loop store accounts + isSigner + isWritable
             for { let i := 0 } lt(i, accountsLen) { i := add(i, 1) } {
-                mstore(dataPtr, mload(add(accounts, add(0x20, mul(i, 0x20)))))
-                mstore8(add(dataPtr, 32), mload(add(isSigner, add(0x20, mul(i, 0x20)))))
-                mstore8(add(dataPtr, 33), mload(add(isWritable, add(0x20, mul(i, 0x20)))))
+                let index := add(32, mul(i, 32))
+                mstore(dataPtr, mload(add(accounts, index)))
+                mstore8(add(dataPtr, 32), mload(add(isSigner, index)))
+                mstore8(add(dataPtr, 33), mload(add(isWritable, index)))
                 dataPtr := add(dataPtr, 34)
             }
 
