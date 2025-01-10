@@ -13,17 +13,20 @@ const bs58 = require("bs58");
 const { createCreateMetadataAccountV3Instruction } = require("@metaplex-foundation/mpl-token-metadata");
 require("dotenv").config();
 
-const connection = new web3.Connection(process.env.CURVESTAND_SOL, "processed");
+const connection = new web3.Connection(process.env.SVM_NODE, "processed");
 
 const keypair = web3.Keypair.fromSecretKey(
     bs58.decode(process.env.PRIVATE_KEY_SOLANA)
 );
 console.log(keypair.publicKey.toBase58(), 'publicKey');
 
-const keypair2 = web3.Keypair.fromSecretKey(
+const solanaUser2 = web3.Keypair.fromSecretKey( // Solana user with ATA & PDA balance
     bs58.decode(process.env.PRIVATE_KEY_SOLANA_2)
 );
-console.log(keypair2.publicKey.toBase58(), 'publicKey');
+
+const solanaUser4 = web3.Keypair.fromSecretKey( // Solana user with tokens balance for airdropping tokens
+    bs58.decode(process.env.PRIVATE_KEY_SOLANA_4)
+);
 
 async function init() {
     const seed = 'seed' + Date.now().toString(); // random seed on each script call
@@ -39,10 +42,17 @@ async function init() {
 
     let keypairAta2 = await getAssociatedTokenAddress(
         createWithSeed,
-        keypair2.publicKey,
+        solanaUser2.publicKey,
         false
     );
     console.log(keypairAta2, 'keypairAta2');
+
+    let keypairAta4 = await getAssociatedTokenAddress(
+        createWithSeed,
+        solanaUser4.publicKey,
+        false
+    );
+    console.log(keypairAta4, 'keypairAta4');
 
     const minBalance = await connection.getMinimumBalanceForRentExemption(MINT_SIZE);
 
@@ -113,7 +123,18 @@ async function init() {
         createAssociatedTokenAccountInstruction(
             keypair.publicKey,
             keypairAta2,
-            keypair2.publicKey,
+            solanaUser2.publicKey,
+            createWithSeed,
+            TOKEN_PROGRAM_ID, 
+            ASSOCIATED_TOKEN_PROGRAM_ID
+        )
+    );
+
+    tx.add(
+        createAssociatedTokenAccountInstruction(
+            keypair.publicKey,
+            keypairAta4,
+            solanaUser4.publicKey,
             createWithSeed,
             TOKEN_PROGRAM_ID, 
             ASSOCIATED_TOKEN_PROGRAM_ID
@@ -125,7 +146,7 @@ async function init() {
             createWithSeed,
             keypairAta,
             keypair.publicKey,
-            1230 * 10 ** 9 // mint 1000 tokens
+            1500 * 10 ** 9 // mint 1500 tokens
         )
     );
 
@@ -134,7 +155,16 @@ async function init() {
             createWithSeed,
             keypairAta2,
             keypair.publicKey,
-            1230 * 10 ** 9 // mint 1000 tokens
+            1500 * 10 ** 9 // mint 1500 tokens
+        )
+    );
+
+    tx.add(
+        createMintToInstruction(
+            createWithSeed,
+            keypairAta4,
+            keypair.publicKey,
+            1500 * 10 ** 9 // mint 1500 tokens
         )
     );
 

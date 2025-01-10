@@ -53,8 +53,9 @@ module.exports = {
       accounts: [process.env.PRIVATE_KEY_OWNER, process.env.USER1_KEY, process.env.USER2_KEY, process.env.USER3_KEY],
       chainId: 245022926,
       allowUnlimitedContractSize: false,
-      gas: "auto",
-      gasPrice: "auto",
+      gasMultiplier: 2,
+      maxFeePerGas: '10000000000000',
+      maxPriorityFeePerGas: '5000000000000'
     },
     neonmainnet: {
       url: "https://neon-proxy-mainnet.solana.p2p.org",
@@ -65,11 +66,12 @@ module.exports = {
       gasPrice: "auto",
     },
     curvestand: {
-        url: process.env.CURVESTAND,
+        url: process.env.EVM_NODE,
         accounts: [process.env.PRIVATE_KEY_OWNER, process.env.USER1_KEY, process.env.USER2_KEY, process.env.USER3_KEY],
         allowUnlimitedContractSize: false,
-        gas: "auto",
-        gasPrice: "auto",
+        gasMultiplier: 2,
+        maxFeePerGas: 10000,
+        maxPriorityFeePerGas: 5000
     },
   },
   mocha: {

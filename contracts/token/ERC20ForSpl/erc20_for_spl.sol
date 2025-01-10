@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.28;
+pragma solidity 0.8.28;
 
 import {ISPLTokenProgram} from "../../precompiles/ISPLTokenProgram.sol";
 import {IMetaplexProgram} from "../../precompiles/IMetaplexProgram.sol";
@@ -142,16 +142,6 @@ contract ERC20ForSplBackbone {
         return true;
     }
 
-    /// @notice Custom ERC20ForSPL function: spends the ERC20 allowance provided by the `from` account to `msg.sender` by
-    /// transferring to a Solana SPL Token account
-    /// @param to The 32 bytes SPL Token account address of the recipient
-    /// @custom:getter balanceOf
-    function transferSolanaFrom(address from, bytes32 to, uint64 amount) public returns (bool) {
-        if (from == address(0)) revert EmptyAddress();
-        _spendAllowance(from, msg.sender, amount);
-        return _transferSolana(to, amount);
-    }
-
     /// @notice ERC20 burn function
     /// @custom:getter balanceOf
     function burn(uint256 amount) public returns (bool) {
@@ -194,6 +184,16 @@ contract ERC20ForSplBackbone {
     /// @param amount The amount to be transferred to the recipient
     /// @custom:getter balanceOf
     function transferSolana(bytes32 to, uint64 amount) public returns (bool) {
+        return _transferSolana(to, amount);
+    }
+
+    /// @notice Custom ERC20ForSPL function: spends the ERC20 allowance provided by the `from` account to `msg.sender` by
+    /// transferring to a Solana SPL Token account
+    /// @param to The 32 bytes SPL Token account address of the recipient
+    /// @custom:getter balanceOf
+    function transferSolanaFrom(address from, bytes32 to, uint64 amount) public returns (bool) {
+        if (from == address(0)) revert EmptyAddress();
+        _spendAllowance(from, msg.sender, amount);
         return _transferSolana(to, amount);
     }
 
@@ -399,6 +399,7 @@ contract ERC20ForSplMintable is ERC20ForSplBackbone {
         uint8 _decimals,
         address _owner
     ) {
+        if (_decimals > 9) revert InvalidDecimals();
         _admin = _owner;
 
         tokenMint = SPLTOKEN_PROGRAM.initializeMint(bytes32(0), _decimals);
@@ -410,6 +411,9 @@ contract ERC20ForSplMintable is ERC20ForSplBackbone {
 
     /// @notice Unauthorized msg.sender.
     error InvalidOwner();
+
+    /// @notice Invalid token decimals. SPLToken program on Solana operates with u64 regarding the token balances.
+    error InvalidDecimals();
 
     /// @return The 32 bytes Solana address of the underlying SPL Token
     function findMintAccount() public pure returns (bytes32) {

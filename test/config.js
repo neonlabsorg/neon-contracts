@@ -4,9 +4,10 @@ const {createApproveInstruction} = require("@solana/spl-token");
 const config = {
     DATA: {
         ADDRESSES: {
-            ERC20ForSplFactory: '0xDb08ab137309D7b8b27eEEdFabaBee4fA03d2b3d',
-            ERC20ForSpl: '0xb76f17F963dE1131D80bB77cc0FEc2089F2E231C',
-            ERC20ForSplTokenMint: 'J7bBsYHHEadYxWnFy11xL2qvvsmkd5rGML97ByPEuX4k'
+            ERC20ForSplFactory: '0xd620837B85Afa3271d597509A6E7D67852A892a6',
+            ERC20ForSpl: '0x3e7B256e21d68CA444EE001964435e4172Ea0e74',
+            ERC20ForSplTokenMint: '2Z6zYexQZ8t5E2McK3RRFhYgMJJb6ihKxPEPeJLi2PmW',
+            MockVault: '0x9bB2E278538611b69Ba5D0d433ef4b5888F6f730'
         }
     },
     utils: {
@@ -17,17 +18,11 @@ const config = {
             return ethers.zeroPadValue(ethers.toBeHex(address), 32);
         },
         calculatePdaAccount: function (prefix, tokenEvmAddress, salt, neonEvmProgram) {
-            /// @param prefix:
-                /// "ContractData" - for ERC20ForSpl PDA accounts
-                    /// Parameter salt is the EVM user address.
-                /// "AUTH" - for external authority in order to use claim & claimTo of ERC20ForSpl standard ( the same as method getExtAuthority in the 006 precompile )
-                    /// Parameter salt is the EVM user address.
-                /// "PAYER" - for getting payer which could be used in a composability request to Solana ( the same as method getPayer in the 006 precompile ).
-                    /// The salt parameter is not passed when using "PAYER" prefix.
+            const neonContractAddressBytes = Buffer.from(config.utils.isValidHex(tokenEvmAddress) ? tokenEvmAddress.replace(/^0x/i, '') : tokenEvmAddress, 'hex');
             const seed = [
                 new Uint8Array([0x03]),
                 new Uint8Array(Buffer.from(prefix, 'utf-8')),
-                Buffer.from(tokenEvmAddress.substring(2), 'hex')
+                new Uint8Array(neonContractAddressBytes)
             ];
 
             if (salt != undefined) {
@@ -89,8 +84,15 @@ const config = {
             getPayer(svmKeypair) {
                 return ethers.dataSlice(ethers.keccak256(svmKeypair.publicKey.toBytes()), 12, 32)
             },
+            isValidHex: function(hex) {
+                const isHexStrict = /^(0x)?[0-9a-f]*$/i.test(hex.toString());
+                if (!isHexStrict) {
+                  throw new Error(`Given value "${hex}" is not a valid hex string.`);
+                }
+                return isHexStrict;
+            },
             hexToBuffer: function(hex) {
-                const _hex = config.utils.isValidHex(hex) ? hex.replace(/^0x/i, '') : hex;
+                const _hex = config.utils.SolanaNativeHelper.isValidHex(hex) ? hex.replace(/^0x/i, '') : hex;
                 return Buffer.from(_hex, 'hex');
             },
             numberToBuffer: function(size) {
@@ -118,6 +120,7 @@ const config = {
                     const byte = Number((bigIntNumber >> BigInt(8 * (31 - i))) & BigInt(0xFF));
                     view.setUint8(i, byte);
                 }
+            
                 return new Uint8Array(buffer);
             },
             toBytesInt32: function(number, littleEndian = true) {
@@ -132,7 +135,7 @@ const config = {
                 const seed = [config.utils.SolanaNativeHelper.numberToBuffer(0x03), neonWalletBuffer, chainIdBytes];
                 return web3.PublicKey.findProgramAddressSync(seed, neonEvmProgram);
             },
-            neonTreeAccountAddressSync: function(neonWallet, neonEvmProgram, chainId, nonce) {
+            neonTreeAccountAddressSync: function(neonWallet, neonEvmProgram, nonce, chainId) {
                 const version = config.utils.SolanaNativeHelper.numberToBuffer(0x03);
                 const tag = config.utils.SolanaNativeHelper.stringToBuffer('TREE');
                 const address = config.utils.SolanaNativeHelper.hexToBuffer(neonWallet);
@@ -149,6 +152,14 @@ const config = {
                 const a = config.utils.SolanaNativeHelper.stringToBuffer('treasury_pool');
                 const b = Buffer.from(config.utils.SolanaNativeHelper.toBytesInt32(treasuryPoolIndex));
                 return web3.PublicKey.findProgramAddressSync([a, b], neonEvmProgram);
+            },
+            serializedNode(childIndex, successLimit) {
+                const gasLimit = toBytes64BE(BigInt(this.data.gasLimit), 32, 24);
+                const value = toBytes64BE(BigInt(this.data.value == '0x' ? 0 : this.data.value), 32, 24);
+                const index = toBytes16LE(childIndex, 2);
+                const success = toBytes16LE(successLimit, 2);
+                const hash = config.utils.SolanaNativeHelper.hexToBuffer(this.hash());
+                return Buffer.concat([gasLimit, value, index, success, hash]);
             },
             createScheduledTransactionInstruction: async function(node, instructionData) {
                 const {
@@ -187,10 +198,44 @@ const config = {
                         [type, count, transaction]
                     )
                 });
+            },
+            buildTransactionBody: function(payer, nonce, chainId, target, callData) {
+                let body =  {
+                    type: 0x7F,
+                    neonSubType: 0x01,
+                    data: {
+                        payer: payer,
+                        sender: '0x',
+                        nonce: ethers.toBeHex(parseInt(nonce, 16)),
+                        index: '0x',
+                        intent: '0x',
+                        intentCallData: '0x',
+                        target: target,
+                        callData: callData,
+                        value: '0x',
+                        chainId: ethers.toBeHex(parseInt(chainId, 16)),
+                        gasLimit: ethers.toBeHex(9999999),
+                        maxFeePerGas: ethers.toBeHex(Date.now() * 5),
+                        maxPriorityFeePerGas: ethers.toBeHex(Date.now())
+                    }
+                }
+                console.log(body, 'body');
+            
+                const result = [];
+                for (const property in body.data) {
+                    result.push(body.data[property]);
+                }
+                console.log(ethers.encodeRlp(result), 'ethers.encodeRlp(result)');
+            
+                return Buffer.concat([
+                    config.utils.SolanaNativeHelper.numberToBuffer([body.type]), 
+                    config.utils.SolanaNativeHelper.numberToBuffer([body.neonSubType]), 
+                    config.utils.SolanaNativeHelper.hexToBuffer(ethers.encodeRlp(result))
+                ]).toString('hex');
             }
         },
         airdropNEON: async function(address) {
-            const postRequestNeons = await fetch(process.env.CURVESTAND_FAUCET, {
+            const postRequestNeons = await fetch(process.env.FAUCET, {
                 method: 'POST',
                 body: JSON.stringify({"amount": 1000, "wallet": address}),
                 headers: { 'Content-Type': 'application/json' }
@@ -200,7 +245,7 @@ const config = {
             await config.utils.asyncTimeout(1000);
         },
         airdropSOL: async function(account) {
-            let postRequest = await fetch(process.env.CURVESTAND_SOL, {
+            let postRequest = await fetch(process.env.SVM_NODE, {
                 method: 'POST',
                 body: JSON.stringify({"jsonrpc":"2.0", "id":1, "method":"requestAirdrop", "params": [account.publicKey.toBase58(), 1000000000]}),
                 headers: { 'Content-Type': 'application/json' }
