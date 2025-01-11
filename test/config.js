@@ -179,6 +179,7 @@ const config = {
                     headers: { 'Content-Type': 'application/json' }
                 });
                 const airdropSolsResponse = await airdropSolsRequest.json();
+                console.log(airdropSolsResponse, 'airdropSolsResponse');
               
                 const keys = [
                     { pubkey: signerAddress, isSigner: true, isWritable: true },
@@ -200,13 +201,19 @@ const config = {
                 });
             },
             buildTransactionBody: function(payer, nonce, chainId, target, callData) {
+                if (parseInt(nonce, 16) == 0) {
+                    nonce = '0x'
+                } else {
+                    nonce = ethers.toBeHex(parseInt(nonce, 16))
+                }
+
                 let body =  {
                     type: 0x7F,
                     neonSubType: 0x01,
                     data: {
                         payer: payer,
                         sender: '0x',
-                        nonce: ethers.toBeHex(parseInt(nonce, 16)),
+                        nonce: nonce,
                         index: '0x',
                         intent: '0x',
                         intentCallData: '0x',
@@ -215,7 +222,7 @@ const config = {
                         value: '0x',
                         chainId: ethers.toBeHex(parseInt(chainId, 16)),
                         gasLimit: ethers.toBeHex(9999999),
-                        maxFeePerGas: ethers.toBeHex(Date.now() * 5),
+                        maxFeePerGas: ethers.toBeHex(5000000000000),
                         maxPriorityFeePerGas: ethers.toBeHex(Date.now())
                     }
                 }
@@ -247,7 +254,7 @@ const config = {
         airdropSOL: async function(account) {
             let postRequest = await fetch(process.env.SVM_NODE, {
                 method: 'POST',
-                body: JSON.stringify({"jsonrpc":"2.0", "id":1, "method":"requestAirdrop", "params": [account.publicKey.toBase58(), 1000000000]}),
+                body: JSON.stringify({"jsonrpc":"2.0", "id":1, "method":"requestAirdrop", "params": [account.publicKey.toBase58(), 100000000000]}),
                 headers: { 'Content-Type': 'application/json' }
             });
             console.log('Airdrop SOLs to', account.publicKey.toBase58());

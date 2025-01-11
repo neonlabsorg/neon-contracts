@@ -494,7 +494,27 @@ describe('Test init', async function () {
 
         describe('Scheduling transaction tests', async function () {
             describe('Tests performed from a Solana user with ATA balance', async function () {
-                it('Validate Solana user 1 balanceOf ( user with only ATA balance )', async function () {
+                it('Validate Solana users 1 & 2 have scheduled at least 1 tx ( to make solanaAddress == true )', async function() {
+                    const randomAddress = ethers.Wallet.createRandom();
+                    const payer1 = config.utils.SolanaNativeHelper.getPayer(solanaUser1);
+                    const payer2 = config.utils.SolanaNativeHelper.getPayer(solanaUser2);
+
+                    await _scheduleTransaction(
+                        solanaUser1, 
+                        ERC20ForSPL.target, 
+                        ERC20ForSPL.interface.encodeFunctionData("approve", [randomAddress.address, ethers.parseUnits('1', TOKEN_MINT_DECIMALS)])
+                    );
+                    expect(await ERC20ForSPL.allowance(payer1, randomAddress.address)).to.be.greaterThan(0);
+
+                    await _scheduleTransaction(
+                        solanaUser2, 
+                        ERC20ForSPL.target, 
+                        ERC20ForSPL.interface.encodeFunctionData("approve", [randomAddress.address, ethers.parseUnits('1', TOKEN_MINT_DECIMALS)])
+                    );
+                    expect(await ERC20ForSPL.allowance(payer2, randomAddress.address)).to.be.greaterThan(0);
+                });
+
+                it('Validate Solana user 1 has given ATA account approval to the ERC20ForSPL ( user with only ATA balance )', async function () {
                     const payer = config.utils.SolanaNativeHelper.getPayer(solanaUser1);
 
                     const solanaUser1TokenAta = await getAssociatedTokenAddress(
@@ -517,6 +537,41 @@ describe('Test init', async function () {
                         ));
                         transaction.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
                         transaction.sign(...[solanaUser1]);
+
+                        const signature = await connection.sendRawTransaction(transaction.serialize(), { skipPreflight: false });
+                        console.log(`\nhttps://explorer.solana.com/tx/${signature}?cluster=custom&customUrl=${process.env.SVM_NODE}`);
+
+                        // wait scheduled tx to be processed
+                        await config.utils.asyncTimeout(SOLANA_TX_TIMEOUT);
+                    }
+
+                    expect(await ERC20ForSPL.balanceOf(payer)).to.be.greaterThan(0);
+                });
+
+                it('Validate Solana user 1 has given ATA account approval to the ERC20ForSPL ( user with both ATA & PDA balance )', async function () {
+                    const payer = config.utils.SolanaNativeHelper.getPayer(solanaUser2);
+
+                    const solanaUser2TokenAta = await getAssociatedTokenAddress(
+                        new web3.PublicKey(config.DATA.ADDRESSES.ERC20ForSplTokenMint),
+                        solanaUser2.publicKey,
+                        false
+                    );
+                    const getUserExtAuthority = ethers.encodeBase58(await ERC20ForSPL.getUserExtAuthority(payer));
+                    const solanaUser2TokenAtaAccount = await getAccount(connection, solanaUser2TokenAta);
+                    console.log(solanaUser2TokenAtaAccount, 'solanaUser2TokenAtaAccount');
+
+                    // Validate Solana user 1 have performed at least 1 scheduled transaction
+                    // grant approval to the erc20forspl contract if needed
+                    if (solanaUser2TokenAtaAccount.delegate == null || solanaUser2TokenAtaAccount.delegate.toBase58() != getUserExtAuthority) {
+                        const transaction = new web3.Transaction();
+                        transaction.add(createApproveInstruction(
+                            solanaUser2TokenAta,
+                            new web3.PublicKey(getUserExtAuthority),
+                            solanaUser2.publicKey,
+                            '18446744073709551615' // max uint64
+                        ));
+                        transaction.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
+                        transaction.sign(...[solanaUser2]);
 
                         const signature = await connection.sendRawTransaction(transaction.serialize(), { skipPreflight: false });
                         console.log(`\nhttps://explorer.solana.com/tx/${signature}?cluster=custom&customUrl=${process.env.SVM_NODE}`);
@@ -551,14 +606,12 @@ describe('Test init', async function () {
                 it('test transferFrom from user2 to Solana user 1', async function () {
                     if (grantedTestersWithBalance) {
                         const payer = config.utils.SolanaNativeHelper.getPayer(solanaUser1);
-                        const user2Allowance = await ERC20ForSPL.allowance(user2.address, payer);
 
-                        const newApprove = user2Allowance + ethers.parseUnits('1', TOKEN_MINT_DECIMALS);
-                        let tx = await ERC20ForSPL.connect(user2).approve(payer, newApprove);
+                        const transferAmount = ethers.parseUnits('1', TOKEN_MINT_DECIMALS);
+                        let tx = await ERC20ForSPL.connect(user2).approve(payer, transferAmount);
                         await tx.wait(RECEIPTS_COUNT);
 
-                        const user2AllowanceAfter = await ERC20ForSPL.allowance(user2.address, payer);
-                        expect(user2AllowanceAfter).to.be.greaterThan(user2Allowance);
+                        expect( await ERC20ForSPL.allowance(user2.address, payer)).to.be.greaterThan(0);
 
                         const currentBalancePayer = await ERC20ForSPL.balanceOf(payer);
                         const currentBalanceUser2 = await ERC20ForSPL.balanceOf(user2.address);
@@ -566,7 +619,7 @@ describe('Test init', async function () {
                         await _scheduleTransaction(
                             solanaUser1, 
                             ERC20ForSPL.target, 
-                            ERC20ForSPL.interface.encodeFunctionData("transferFrom", [user2.address, payer, user2AllowanceAfter])
+                            ERC20ForSPL.interface.encodeFunctionData("transferFrom", [user2.address, payer, transferAmount])
                         );
 
                         expect(await ERC20ForSPL.balanceOf(payer)).to.be.greaterThan(currentBalancePayer);
@@ -656,6 +709,7 @@ async function _scheduleTransaction(svmKeypair, target, callData) {
     const [treeAccountAddress] = config.utils.SolanaNativeHelper.neonTreeAccountAddressSync(payer, neonEvmProgram, nonce, parseInt(chainId, 16));
     const [authorityPoolAddress] = config.utils.SolanaNativeHelper.neonAuthorityPoolAddressSync(neonEvmProgram);
     const associatedTokenAddress = await getAssociatedTokenAddress(new web3.PublicKey('So11111111111111111111111111111111111111112'), authorityPoolAddress, true);
+
     
     const index = Math.floor(Math.random() * neon_getEvmParams.result.neonTreasuryPoolCount) % neon_getEvmParams.result.neonTreasuryPoolCount;
     const treasuryPool = {
@@ -681,8 +735,11 @@ async function _scheduleTransaction(svmKeypair, target, callData) {
     transaction.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
     transaction.sign(...[svmKeypair]);
 
+    const balanceBeforeTx = await connection.getBalance(svmKeypair.publicKey);
     const signature = await connection.sendRawTransaction(transaction.serialize(), { skipPreflight: false });
     console.log(`\nhttps://explorer.solana.com/tx/${signature}?cluster=custom&customUrl=${process.env.SVM_NODE}`);
+
+    console.log('Paid -', (balanceBeforeTx - await connection.getBalance(svmKeypair.publicKey)) / 10 ** TOKEN_MINT_DECIMALS, 'SOLs', '\n');
 
     // wait scheduled tx to be processed
     await config.utils.asyncTimeout(SOLANA_TX_TIMEOUT);
