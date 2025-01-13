@@ -4,10 +4,10 @@ const {createApproveInstruction} = require("@solana/spl-token");
 const config = {
     DATA: {
         ADDRESSES: {
-            ERC20ForSplFactory: '0xd620837B85Afa3271d597509A6E7D67852A892a6',
-            ERC20ForSpl: '0x3e7B256e21d68CA444EE001964435e4172Ea0e74',
-            ERC20ForSplTokenMint: '2Z6zYexQZ8t5E2McK3RRFhYgMJJb6ihKxPEPeJLi2PmW',
-            MockVault: '0x9bB2E278538611b69Ba5D0d433ef4b5888F6f730'
+            ERC20ForSplFactory: '0xDBa5aad2282beAa306706bC9D9B653B8faF2EBDc',
+            ERC20ForSpl: '0x16D0288cF41675BE5EB585297b22E765F685029d',
+            ERC20ForSplTokenMint: 'CSrhJ2ce1XWTbv8teVjmMks1ppJ7bNxQqc1oE4ttTy33',
+            MockVault: '0x576f587c82815f489B0C301E6F80cDA9a3E6eD2F'
         }
     },
     utils: {
@@ -179,7 +179,6 @@ const config = {
                     headers: { 'Content-Type': 'application/json' }
                 });
                 const airdropSolsResponse = await airdropSolsRequest.json();
-                console.log(airdropSolsResponse, 'airdropSolsResponse');
               
                 const keys = [
                     { pubkey: signerAddress, isSigner: true, isWritable: true },
@@ -226,13 +225,11 @@ const config = {
                         maxPriorityFeePerGas: ethers.toBeHex(Date.now())
                     }
                 }
-                console.log(body, 'body');
             
                 const result = [];
                 for (const property in body.data) {
                     result.push(body.data[property]);
                 }
-                console.log(ethers.encodeRlp(result), 'ethers.encodeRlp(result)');
             
                 return Buffer.concat([
                     config.utils.SolanaNativeHelper.numberToBuffer([body.type]), 

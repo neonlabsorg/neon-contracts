@@ -43,8 +43,6 @@ contract ERC20ForSplBackbone {
     /// @dev Special event for SPL Token transfer to a Solana account
     event TransferSolana(address indexed from, bytes32 indexed to, uint64 amount);
 
-    /// @notice Request to reading data from Solana account has failed.
-    error FailedQueryAccountRequest(bytes32 account);
     /// @notice Passed EVM address is empty.
     error EmptyAddress();
     /// @notice Spending more than the allowed amount.
@@ -184,7 +182,7 @@ contract ERC20ForSplBackbone {
     /// @param amount The amount to be transferred to the recipient
     /// @custom:getter balanceOf
     function transferSolana(bytes32 to, uint64 amount) public returns (bool) {
-        return _transferSolana(to, amount);
+        return _transferSolana(msg.sender, to, amount);
     }
 
     /// @notice Custom ERC20ForSPL function: spends the ERC20 allowance provided by the `from` account to `msg.sender` by
@@ -194,7 +192,7 @@ contract ERC20ForSplBackbone {
     function transferSolanaFrom(address from, bytes32 to, uint64 amount) public returns (bool) {
         if (from == address(0)) revert EmptyAddress();
         _spendAllowance(from, msg.sender, amount);
-        return _transferSolana(to, amount);
+        return _transferSolana(from, to, amount);
     }
 
     /// @notice Custom ERC20ForSPL function: spends the SPL Token delegation provided by the `from` Solana SPL Token
@@ -309,11 +307,13 @@ contract ERC20ForSplBackbone {
     }
 
     /// @notice Internal function to transfer tokens to a Solana SPL Token account
-    function _transferSolana(bytes32 to, uint64 amount) internal returns (bool) {
-        SPLTOKEN_PROGRAM.transfer(solanaAccount(msg.sender), to, uint64(amount));
+    function _transferSolana(address from, bytes32 to, uint64 amount) internal returns (bool) {
+        bytes32 fromSolana = solanaAccount(from);
+        if (SPLTOKEN_PROGRAM.getAccount(fromSolana).amount < amount) revert AmountExceedsBalance();
+        SPLTOKEN_PROGRAM.transfer(fromSolana, to, uint64(amount));
 
-        emit Transfer(msg.sender, address(0), amount);
-        emit TransferSolana(msg.sender, to, amount);
+        emit Transfer(from, address(0), amount);
+        emit TransferSolana(from, to, amount);
         return true;
     }
 

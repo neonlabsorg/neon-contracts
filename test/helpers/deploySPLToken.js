@@ -11,6 +11,7 @@ const {
 const { Metaplex } = require("@metaplex-foundation/js");
 const bs58 = require("bs58");
 const { createCreateMetadataAccountV3Instruction } = require("@metaplex-foundation/mpl-token-metadata");
+const { config } = require('../config');
 require("dotenv").config();
 
 const connection = new web3.Connection(process.env.SVM_NODE, "processed");
@@ -29,6 +30,10 @@ const solanaUser4 = web3.Keypair.fromSecretKey( // Solana user with tokens balan
 );
 
 async function init() {
+    if (await connection.getBalance(keypair.publicKey) == 0) {
+        await config.utils.airdropSOL(keypair);
+    }
+
     const seed = 'seed' + Date.now().toString(); // random seed on each script call
     const createWithSeed = await web3.PublicKey.createWithSeed(keypair.publicKey, seed, new web3.PublicKey(TOKEN_PROGRAM_ID));
     console.log(createWithSeed, 'createWithSeed');
@@ -119,7 +124,7 @@ async function init() {
         )
     );
 
-    tx.add(
+    /* tx.add(
         createAssociatedTokenAccountInstruction(
             keypair.publicKey,
             keypairAta2,
@@ -128,7 +133,7 @@ async function init() {
             TOKEN_PROGRAM_ID, 
             ASSOCIATED_TOKEN_PROGRAM_ID
         )
-    );
+    ); */
 
     tx.add(
         createAssociatedTokenAccountInstruction(
@@ -150,15 +155,15 @@ async function init() {
         )
     );
 
-    tx.add(
+    /* tx.add(
         createMintToInstruction(
             createWithSeed,
             keypairAta2,
             keypair.publicKey,
             1500 * 10 ** 9 // mint 1500 tokens
         )
-    );
-
+    ); */
+    
     tx.add(
         createMintToInstruction(
             createWithSeed,
