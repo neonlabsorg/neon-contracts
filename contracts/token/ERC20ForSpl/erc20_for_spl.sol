@@ -91,9 +91,10 @@ contract ERC20ForSplBackbone {
     ///
     /// The SPL Token program uses an associated token account (ATA) derived from a user's native Solana account to store
     /// a user's token balance. In the case where the `account` address refers to a native Solana account (32 bytes
-    /// address returned by the `SOLANA_NATIVE.solanaAddress(address)` function) we also fetch the token balance stored
+    /// address returned by the `SOLANA_NATIVE.solanaAddress(account)` function) we also fetch the token balance stored
     /// in the associated token account (ATA) derived from this Solana account (32 bytes address returned by the
-    /// `getTokenMintATA(bytes32)` function.
+    /// `getTokenMintATA(bytes32)` function. However, this ATA balance is only spendable if the `account`'s external
+    /// authority has been set as the delegate of the ATA, in which case it is added to the spendable token balance.
     function balanceOf(address account) public view returns (uint256) {
         uint balance = SPLTOKEN_PROGRAM.getAccount(solanaAccount(account)).amount;
         bytes32 solanaAddress = SOLANA_NATIVE.solanaAddress(account);
@@ -103,7 +104,9 @@ contract ERC20ForSplBackbone {
             if (!SPLTOKEN_PROGRAM.isSystemAccount(tokenMintATA)) {
                 ISPLTokenProgram.Account memory tokenMintATAData = SPLTOKEN_PROGRAM.getAccount(tokenMintATA);
                 if (tokenMintATAData.delegate == getUserExtAuthority(account)) {
-                    balance+= (tokenMintATAData.delegated_amount > tokenMintATAData.amount) ? tokenMintATAData.amount : tokenMintATAData.delegated_amount;
+                    balance += (tokenMintATAData.delegated_amount > tokenMintATAData.amount)
+                        ? tokenMintATAData.amount
+                        : tokenMintATAData.delegated_amount;
                 }
             }
         }
@@ -350,7 +353,13 @@ contract ERC20ForSplBackbone {
     }
 
     /// @notice Custom ERC20ForSPL getter function
-    /// @return A solana account which can be used as external authority to spend approvals from Solana to Neon
+    /// @return The 'external authority' Solana account which must be set as the delegate of a Solana token account such
+    /// that the NeonEVM `account` passed as argument to the `getUserExtAuthority` function can call the `claim` or
+    /// `claimTo` function to transfer tokens from the delegated Solana token account.
+    /// @dev In the case where the `account` address refers to a native Solana account (32 bytes address returned by the
+    /// `SOLANA_NATIVE.solanaAddress(account)` function) any token amount delegated by the native Solana account's ATA
+    /// to this external authority is transferable using the `transfer` function and is added to the `account` balance
+    /// returned by the `balanceOf` function.
     function getUserExtAuthority(address account) public view returns(bytes32) {
         return CALL_SOLANA.getSolanaPDA(
             NEON_EVM_PROGRAM,
