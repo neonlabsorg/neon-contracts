@@ -4,10 +4,10 @@ const {createApproveInstruction} = require("@solana/spl-token");
 const config = {
     DATA: {
         ADDRESSES: {
-            ERC20ForSplFactory: '0xDBa5aad2282beAa306706bC9D9B653B8faF2EBDc',
-            ERC20ForSpl: '0x16D0288cF41675BE5EB585297b22E765F685029d',
-            ERC20ForSplTokenMint: 'CSrhJ2ce1XWTbv8teVjmMks1ppJ7bNxQqc1oE4ttTy33',
-            MockVault: '0x576f587c82815f489B0C301E6F80cDA9a3E6eD2F'
+            ERC20ForSplFactory: '',
+            ERC20ForSpl: '',
+            ERC20ForSplTokenMint: '54pL3nE7yDddmNxRWSK7tfaJQ8Fot25poY42fv8bRiER',
+            MockVault: ''
         }
     },
     utils: {
