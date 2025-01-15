@@ -150,13 +150,13 @@ contract ERC20ForSplBackbone {
         return true;
     }
 
-    /// @notice Custom ERC20ForSPL function: provides SPL Token delegation to a Solana SPL Token account.
+    /// @notice Custom ERC20ForSPL function: provides SPL Token delegation to a Solana SPL account.
     /// @dev SPL Token delegation is similar to an ERC20 allowance but it is not stored in the ERC20 `_allowances`
     /// mapping and can only be spent using the `claim` or `claimTo` functions.
     ///
     /// The SPL Token standard's concept of 'delegation' differs from ERC20 'allowances' in that it is only possible to
-    /// delegate to one single SPL Token account and subsequent delegations will erase previous delegations.
-    /// @param spender The 32 bytes address of the delegate account, i.e. the Solana SPL Token account to be approved
+    /// delegate to one single Solana account and subsequent delegations will erase previous delegations.
+    /// @param spender The 32 bytes address of the delegate account, i.e. the Solana account to be approved
     /// @param amount The amount to be delegated to the delegate
     /// @custom:getter getAccountDelegateData
     function approveSolana(bytes32 spender, uint64 amount) public returns (bool) {
@@ -191,9 +191,9 @@ contract ERC20ForSplBackbone {
     }
 
     /// @notice Custom ERC20ForSPL function: spends the SPL Token delegation provided by the `from` Solana SPL Token
-    /// account to the NeonEVM arbitrary token account attributed to `msg.sender`
-    /// @param from The 32 bytes SPL Token account address which provided delegation to the NeonEVM arbitrary token
-    /// account attributed to `msg.sender`
+    /// account to the external authority of NeonEVM arbitrary token account attributed to `msg.sender`
+    /// @param from The 32 bytes SPL Token account address which provided delegation to the external authority of
+    /// NeonEVM arbitrary token account attributed to `msg.sender`
     /// @param amount The amount to be transferred to the NeonEVM arbitrary token account attributed to `msg.sender`
     /// @custom:getter balanceOf
     function claim(bytes32 from, uint64 amount) external returns (bool) {
@@ -201,10 +201,10 @@ contract ERC20ForSplBackbone {
     }
 
     /// @notice Custom ERC20ForSPL function: spends the SPL Token delegation provided by the `from` Solana SPL Token
-    /// account to the NeonEVM arbitrary token account attributed to `msg.sender` and transfers to the NeonEVM
-    /// arbitrary token account attributed to the `to` address
-    /// @param from The 32 bytes SPL Token account address which provided delegation to the NeonEVM arbitrary token
-    /// account attributed to `msg.sender`
+    /// account to the external authority of NeonEVM arbitrary token account attributed to `msg.sender` and transfers to
+    /// the NeonEVM arbitrary token account attributed to the `to` address
+    /// @param from The 32 bytes SPL Token account address which provided delegation to the external authority of
+    /// NeonEVM arbitrary token account attributed to `msg.sender`
     /// @param to The NeonEVM address of the recipient
     /// @param amount The amount to be transferred to the NeonEVM arbitrary token account attributed to the `to` address
     /// @custom:getter balanceOf
