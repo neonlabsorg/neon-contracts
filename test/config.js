@@ -1,12 +1,12 @@
 const web3 = require("@solana/web3.js");
-const {createApproveInstruction} = require("@solana/spl-token");
+const {createApproveInstruction, getAssociatedTokenAddress} = require("@solana/spl-token");
 
 const config = {
     DATA: {
         ADDRESSES: {
             ERC20ForSplFactory: '',
             ERC20ForSpl: '',
-            ERC20ForSplTokenMint: 'Fb1d4VxjSaronSSZKG72Ak81nsgZu2UWcZjEkV57gi68',
+            ERC20ForSplTokenMint: 'FU5ktmvCpAmiuZYqpBBhjDACZqpb9DyjoVa7Ld4BMpjK',
             MockVault: ''
         }
     },
@@ -236,6 +236,67 @@ const config = {
                     config.utils.SolanaNativeHelper.numberToBuffer([body.neonSubType]), 
                     config.utils.SolanaNativeHelper.hexToBuffer(ethers.encodeRlp(result))
                 ]).toString('hex');
+            },
+            scheduleTransaction: async function(connection, neon_getEvmParams, svmKeypair, target, callData) {
+                const payer = this.getPayer(svmKeypair);
+                console.log(payer, 'payer');
+
+                const signerAddress = svmKeypair.publicKey;
+                const eth_getTransactionCountRequest = await fetch(process.env.EVM_SOL_NODE, {
+                    method: 'POST',
+                    body: JSON.stringify({"method":"eth_getTransactionCount","params":[payer, "latest"],"id":1,"jsonrpc":"2.0"}),
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                const nonce = (await eth_getTransactionCountRequest.json()).result;
+                console.log(nonce, 'nonce');
+
+                const eth_chainIdRequest = await fetch(process.env.EVM_SOL_NODE, {
+                    method: 'POST',
+                    body: JSON.stringify({"method":"eth_chainId","params":[],"id":1,"jsonrpc":"2.0"}),
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                const chainId = (await eth_chainIdRequest.json()).result;
+
+                const neonEvmProgram = new web3.PublicKey(neon_getEvmParams.result.neonEvmProgramId);
+                const neonTransaction = this.buildTransactionBody(
+                    payer,
+                    nonce,
+                    chainId,
+                    target,
+                    callData
+                );
+
+                const [balanceAddress] = this.neonBalanceProgramAddressSync(payer, neonEvmProgram, parseInt(chainId, 16));
+                const [treeAccountAddress] = this.neonTreeAccountAddressSync(payer, neonEvmProgram, nonce, parseInt(chainId, 16));
+                const [authorityPoolAddress] = this.neonAuthorityPoolAddressSync(neonEvmProgram);
+                const associatedTokenAddress = await getAssociatedTokenAddress(new web3.PublicKey('So11111111111111111111111111111111111111112'), authorityPoolAddress, true);
+
+
+                const index = Math.floor(Math.random() * neon_getEvmParams.result.neonTreasuryPoolCount) % neon_getEvmParams.result.neonTreasuryPoolCount;
+                const treasuryPool = {
+                    index: index,
+                    publicKey: this.treasuryPoolAddressSync(neonEvmProgram, index)[0]
+                };
+
+                let instruction = await this.createScheduledTransactionInstruction(
+                    process.env.SVM_NODE,
+                    {
+                        neonEvmProgram,
+                        signerAddress,
+                        balanceAddress,
+                        treeAccountAddress,
+                        associatedTokenAddress,
+                        treasuryPool,
+                        neonTransaction
+                    }
+                );
+
+                const transaction = new web3.Transaction();
+                transaction.add(instruction);
+                transaction.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
+                transaction.sign(...[svmKeypair]);
+
+                return await connection.sendRawTransaction(transaction.serialize(), { skipPreflight: false });
             }
         },
         airdropNEON: async function(address) {
@@ -257,7 +318,7 @@ const config = {
             console.log('Airdrop SOLs to', account.publicKey.toBase58());
 
             await config.utils.asyncTimeout(1000);
-        }
+        },
     },
 };
 module.exports = { config };
