@@ -150,9 +150,9 @@ contract ERC20ForSplBackbone {
         return true;
     }
 
-    /// @notice Custom ERC20ForSPL function: provides SPL Token delegation to a Solana SPL account.
+    /// @notice Custom ERC20ForSPL function: provides SPL Token delegation to a Solana account.
     /// @dev SPL Token delegation is similar to an ERC20 allowance but it is not stored in the ERC20 `_allowances`
-    /// mapping and can only be spent using the `claim` or `claimTo` functions.
+    /// mapping.
     ///
     /// The SPL Token standard's concept of 'delegation' differs from ERC20 'allowances' in that it is only possible to
     /// delegate to one single Solana account and subsequent delegations will erase previous delegations.
@@ -373,6 +373,11 @@ contract ERC20ForSplBackbone {
         return bytes32(uint256(uint160(account)));
     }
 
+    /// @return The 32 bytes public key of the Solana SPL associated token account (ATA) owned by the Solana account
+    /// associated to the NeonEVM `account` address, and the ATA balance that is delegated to the external authority of
+    /// the _NeonEVM_ `account`. If `skipDelegateCheck` is set to `true` then the returned delegated ATA balance is `0`.
+    /// If the Solana account associated to the NeonEVM `account` has not been registered into NeonEVM the function will
+    /// return `(bytes32(0), 0)`.
     function _getSolanaATA(address account, bool skipDelegateCheck) internal view returns(bytes32, uint64) {
         bytes32 solanaAddress = SOLANA_NATIVE.solanaAddress(account);
 
@@ -388,7 +393,7 @@ contract ERC20ForSplBackbone {
                 }
             }
         }
-        return (bytes32(0) ,0);
+        return (bytes32(0), 0);
     }
 }
 
