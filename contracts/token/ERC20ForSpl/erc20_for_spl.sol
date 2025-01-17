@@ -98,7 +98,7 @@ contract ERC20ForSplBackbone {
     function balanceOf(address account) public view returns (uint256) {
         uint balance = SPLTOKEN_PROGRAM.getAccount(solanaAccount(account)).amount;
 
-        (bytes32 ataAccount, uint64 ataBalance) = _isSolanaUser(account, false);
+        (bytes32 ataAccount, uint64 ataBalance) = _getSolanaATA(account, false);
         if (ataAccount != bytes32(0)) {
             balance += ataBalance;
         }
@@ -263,7 +263,7 @@ contract ERC20ForSplBackbone {
         bytes32 fromSolanaATA;
         uint64 availableATABalance;
         if (pdaBalance < amount) {
-            (bytes32 ataAccount, uint64 ataBalanceFrom) = _isSolanaUser(from, false);
+            (bytes32 ataAccount, uint64 ataBalanceFrom) = _getSolanaATA(from, false);
             if (ataAccount != bytes32(0)) {
                 fromSolanaATA = ataAccount;
                 availableATABalance += ataBalanceFrom;
@@ -276,7 +276,7 @@ contract ERC20ForSplBackbone {
         // derived from this Solana account. Otherwise, we transfer to NeonEVM's arbitrary token account associated to
         // the `to` address
         bytes32 toSolana;
-        (bytes32 ataAccountTo,) = _isSolanaUser(to, true);
+        (bytes32 ataAccountTo,) = _getSolanaATA(to, true);
         if (ataAccountTo != bytes32(0)) {
             toSolana = ataAccountTo;
         } else {
@@ -373,7 +373,7 @@ contract ERC20ForSplBackbone {
         return bytes32(uint256(uint160(account)));
     }
 
-    function _isSolanaUser(address account, bool skipDelegateCheck) internal view returns(bytes32, uint64) {
+    function _getSolanaATA(address account, bool skipDelegateCheck) internal view returns(bytes32, uint64) {
         bytes32 solanaAddress = SOLANA_NATIVE.solanaAddress(account);
 
         if (solanaAddress != bytes32(0)) {
