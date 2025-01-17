@@ -98,8 +98,8 @@ contract ERC20ForSplBackbone {
     function balanceOf(address account) public view returns (uint256) {
         uint balance = SPLTOKEN_PROGRAM.getAccount(solanaAccount(account)).amount;
 
-        (bool isSolanaUser, uint64 ataBalance,) = _isSolanaUser(account, false);
-        if (isSolanaUser) {
+        (bytes32 ataAccount, uint64 ataBalance) = _isSolanaUser(account, false);
+        if (ataAccount != bytes32(0)) {
             balance += ataBalance;
         }
         return balance;
@@ -263,8 +263,8 @@ contract ERC20ForSplBackbone {
         bytes32 fromSolanaATA;
         uint64 availableATABalance;
         if (pdaBalance < amount) {
-            (bool isSolanaUserFrom, uint64 ataBalanceFrom, bytes32 ataAccount) = _isSolanaUser(from, false);
-            if (isSolanaUserFrom) {
+            (bytes32 ataAccount, uint64 ataBalanceFrom) = _isSolanaUser(from, false);
+            if (ataAccount != bytes32(0)) {
                 fromSolanaATA = ataAccount;
                 availableATABalance += ataBalanceFrom;
             }
@@ -276,8 +276,8 @@ contract ERC20ForSplBackbone {
         // derived from this Solana account. Otherwise, we transfer to NeonEVM's arbitrary token account associated to
         // the `to` address
         bytes32 toSolana;
-        (bool isSolanaUserTo, , bytes32 ataAccountTo) = _isSolanaUser(to, true);
-        if (isSolanaUserTo) {
+        (bytes32 ataAccountTo,) = _isSolanaUser(to, true);
+        if (ataAccountTo != bytes32(0)) {
             toSolana = ataAccountTo;
         } else {
             toSolana = solanaAccount(to);
@@ -373,7 +373,7 @@ contract ERC20ForSplBackbone {
         return bytes32(uint256(uint160(account)));
     }
 
-    function _isSolanaUser(address account, bool skipDelegateCheck) internal view returns(bool, uint64, bytes32) {
+    function _isSolanaUser(address account, bool skipDelegateCheck) internal view returns(bytes32, uint64) {
         bytes32 solanaAddress = SOLANA_NATIVE.solanaAddress(account);
 
         if (solanaAddress != bytes32(0)) {
@@ -382,14 +382,13 @@ contract ERC20ForSplBackbone {
                 ISPLTokenProgram.Account memory tokenMintATAData = SPLTOKEN_PROGRAM.getAccount(tokenMintATA);
                 if (skipDelegateCheck || tokenMintATAData.delegate == getUserExtAuthority(account)) {
                     return (
-                        true,
-                        (tokenMintATAData.delegated_amount > tokenMintATAData.amount) ? tokenMintATAData.amount : tokenMintATAData.delegated_amount,
-                        tokenMintATA
+                        tokenMintATA,
+                        (tokenMintATAData.delegated_amount > tokenMintATAData.amount) ? tokenMintATAData.amount : tokenMintATAData.delegated_amount
                     );
                 }
             }
         }
-        return (false, 0, bytes32(0));
+        return (bytes32(0) ,0);
     }
 }
 
