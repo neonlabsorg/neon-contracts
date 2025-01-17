@@ -1,8 +1,10 @@
 # ERC20ForSPL standard
 
 The **ERC20ForSPL** standard provides a standard **ERC20** interface supplemented with custom functions and variables 
-providing compatibility with _Solana_'s **SPL Token** interface. This standard allows _NeonEVM_ users and dApps to 
-interact with **ERC20** tokens deployed on _NeonEVM_ as well as native _Solana_ SPL tokens.
+providing compatibility with _Solana_'s **SPL Token** interface. This standard allows for _NeonEVM_ users and dApps to 
+interact with **ERC20ForSPL** tokens deployed on _NeonEVM_ as well as **SPL** tokens deployed on _Solana_, all from a 
+regular EVM wallet. It also makes it possible for _Solana_ users to natively interact with- **ERC20ForSPL** tokens deployed on _NeonEVM_ by 
+scheduling _NeonEVM_ transactions from a regular _Solana_ wallet (see: **Solana native support**).
 
 ## ERC20ForSPL vs ERC20ForSPLMintable contracts
 
@@ -28,9 +30,9 @@ functions respectively.
 
 ## Custom functions and variables
 
-| bytes32 tokenMint                                                   |
-|:--------------------------------------------------------------------|
-| Hex-encoded 32 bytes address of the underlying _Solana_ SPL Token.  |
+| bytes32 tokenMint                                                       |
+|:------------------------------------------------------------------------|
+| Hex-encoded 32 bytes address of the underlying _Solana_ SPL Token mint. |
 
 | **transferSolana**(bytes32 to, uint64 amount) → bool                                                                                                                          |
 |:------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
@@ -40,17 +42,17 @@ functions respectively.
 |:-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | Spends the ERC20 allowance provided by the `from` account to `msg.sender` by transferring to a _Solana_ SPL Token account. <br/><br/>`from` The address of the _NeonEVM_ account that provided allowance to `msg.sender` <br/>`to` The 32 bytes SPL Token account address of the recipient <br/>`amount` The amount to be transferred to the recipient |
 
-| **approveSolana**(bytes32 spender, uint64 amount) → bool                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
-|:---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| Provides SPL Token delegation to a _Solana_ SPL Token account. Token delegation is similar to an ERC20 allowance but it is not stored in the ERC20 `_allowances` mapping and can only be spent using the `claim` or `claimTo` functions. The SPL Token standard's concept of delegation differs from ERC20 allowances in that it is only possible to delegate to one single SPL Token account and subsequent delegations will erase previous delegations.<br/><br/>`spender` The 32 bytes address of the delegate account, i.e. the _Solana_ SPL Token account to be approved <br/>`amount` The amount to be delegated to the delegate |
+| **approveSolana**(bytes32 spender, uint64 amount) → bool                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+|:--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Provides SPL Token delegation to a _Solana_ account. Token delegation is similar to an ERC20 allowance but it is not stored in the ERC20 `_allowances` mapping. The SPL Token standard's concept of delegation differs from ERC20 allowances in that it is only possible to delegate to one single Solana account and subsequent delegations will erase previous delegations.<br/><br/>`spender` The 32 bytes address of the delegate account, i.e. the _Solana_ SPL Token account to be approved <br/>`amount` The amount to be delegated to the delegate |
 
-| **claim**(bytes32 from, uint64 amount) → bool                                                                                                                                                                                                                                                                                                                                                                              |
-|:---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| Spends the SPL Token delegation provided  by the `from` _Solana_ SPL Token account to the _NeonEVM_ arbitrary token account attributed to `msg.sender`<br/><br/>`from` The 32 bytes SPL Token account address which provided delegation to the _NeonEVM_ arbitrary token account attributed to `msg.sender` <br/>`amount` The amount to be transferred to the _NeonEVM_ arbitrary token account attributed to `msg.sender` |
+| **claim**(bytes32 from, uint64 amount) → bool                                                                                                                                                                                                                                                                                                                                                                                                        |
+|:-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Spends the SPL Token delegation provided  by the `from` _Solana_ SPL Token account to the external authority of the _NeonEVM_ arbitrary token account attributed to `msg.sender`<br/><br/>`from` The 32 bytes SPL Token account address which provided delegation to the _NeonEVM_ arbitrary token account attributed to `msg.sender` <br/>`amount` The amount to be transferred to the _NeonEVM_ arbitrary token account attributed to `msg.sender` |
 
-| **claimTo**(bytes32 from, address to, uint64 amount) → bool                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
-|:-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| Spends the SPL Token delegation provided  by the `from` _Solana_ SPL Token account to the _NeonEVM_ arbitrary token account attributed to `msg.sender` and transfers to the _NeonEVM_ arbitrary token account attributed to the `to` address<br/><br/>`from` The 32 bytes SPL Token account address which provided delegation to the _NeonEVM_ arbitrary token account attributed to `msg.sender`  <br/>`to` The _NeonEVM_ address of the recipient <br/>`amount` The amount to be transferred to the _NeonEVM_ arbitrary token account attributed to `msg.sender` |
+| **claimTo**(bytes32 from, address to, uint64 amount) → bool                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+|:--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Spends the SPL Token delegation provided  by the `from` _Solana_ SPL Token account to the external authority of the _NeonEVM_ arbitrary token account attributed to `msg.sender` and transfers to the _NeonEVM_ arbitrary token account attributed to the `to` address<br/><br/>`from` The 32 bytes SPL Token account address which provided delegation to the _NeonEVM_ arbitrary token account attributed to `msg.sender`  <br/>`to` The _NeonEVM_ address of the recipient <br/>`amount` The amount to be transferred to the _NeonEVM_ arbitrary token account attributed to `msg.sender` |
 
 | **solanaAccount**(address account) → bytes32                                                                                                                                                                                                                     |
 |:-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
@@ -66,9 +68,51 @@ functions respectively.
 
 ## Solana native support
 
-_NeonEVM_ now supports transactions scheduling for native _Solana_ users. Using the **Neon dApp** website, native 
-_Solana_ accounts are attributed a _NeonEVM_ account and can easily schedule _NeonEVM_ transactions, signing with their 
-_Solana_ account. Scheduled transactions are then picked-up by Neon proxies and executed on _NeonEVM_.
+The _Solana native_ feature of _NeonEVM_ makes it possible to seamlessly execute state-mutative transactions
+on _NeonEVM_ from a regular _Solana_ wallet. This is achieved via transactions scheduling: native _Solana_ users can now 
+easily schedule _NeonEVM_ transactions using their regular _Solana_ wallet, and be attributed a _NeonEVM_ account. 
 
-This _Solana native_ feature of _NeonEVM_ allows native _Solana_ users to seamlessly execute state-mutative transactions 
-on _NeonEVM_ from their native Solana wallet.
+### Native Solana account registration
+
+In order to register a native _Solana_ account into _NeonEVM_, a user must successfully schedule at least one 
+transaction on _NeonEVM_ from that native _Solana_ account.
+
+Registering a native _Solana_ account means a _NeonEVM_ account is attributed to the registered _Solana_ account and
+the user who owns that _Solana_ account can now spend **ERC20ForSPL** tokens received on that _NeonEVM_ account, even if
+those tokens were received prior to the _Solana_ account registration.
+
+### Receiving ERC20ForSPL tokens
+
+A native _Solana_ user can always receive **ERC20ForSPL** tokens on the _NeonEVM_ account derived from the user's 
+_Solana_ account, even if that _Solana_ account has not yet been registered into _NeonEVM_. This _NeonEVM_ account 
+address is derived as the last 20 bytes of the keccak256 hash of the _Solana_ account's public key.
+
+Until a user's _Solana_ account has been registered, **ERC20ForSPL** tokens sent to that user's _NeonEVM_ account are
+credited to the user's **arbitrary token account** on _Solana_.
+
+Once a user's _Solana_ account has been registered, **ERC20ForSPL** tokens sent to that user's _NeonEVM_ account will be
+credited to the user's **SPL associated token account** (ATA) on _Solana_.
+
+### Spending ERC20ForSPL tokens
+
+#### Spending arbitrary token account balance
+
+To be able to spend **ERC20ForSPL** tokens received before the user's _Solana_ account has been registered (and credited
+to the user's **arbitrary token account** on _Solana_) the user's native _Solana_ account must first be **registered** 
+into _NeonEVM_.
+
+#### Spending Solana ATA balance
+
+To be able to spend the token balance held on a _Solana_ **SPL associated token account** (ATA) via the corresponding 
+**ERC20ForSPL** smart contract deployed on _NeonEVM_, the native _Solana_ user who owns that ATA must have done the 
+following:
+
+ - To have successfully registered the native _Solana_ account that owns the ATA, i.e. to have scheduled at least one 
+_NeonEVM_ transaction from the native _Solana_ account that owns the ATA in order to have a _NeonEVM_ account attributed
+to that native _Solana_ account
+ - To have delegated (on _Solana_) the ATA token balance to the **external authority** (_Solana_ account) associated to 
+the attributed _NeonEVM_ account (the address of this **external authority** _Solana_ account can be obtained by calling
+the `getUserExtAuthority` function, passing the attributed _NeonEVM_ account `address`).
+
+Once those two steps have been completed, the _Solana_ user's ATA token balance will be included in the balance returned
+by the `balanceOf` function and this ATA token balance will be spendable via the `transfer` and `transferFrom` functions.
