@@ -6,7 +6,7 @@ const config = {
         ADDRESSES: {
             ERC20ForSplFactory: '',
             ERC20ForSpl: '',
-            ERC20ForSplTokenMint: '54pL3nE7yDddmNxRWSK7tfaJQ8Fot25poY42fv8bRiER',
+            ERC20ForSplTokenMint: '4ThjucPENe1N8cVdU8nUnnjQd1AjbuVviVBzVKmnAEfR',
             MockVault: ''
         }
     },

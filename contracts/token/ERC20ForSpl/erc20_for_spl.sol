@@ -97,18 +97,10 @@ contract ERC20ForSplBackbone {
     /// authority has been set as the delegate of the ATA, in which case it is added to the spendable token balance.
     function balanceOf(address account) public view returns (uint256) {
         uint balance = SPLTOKEN_PROGRAM.getAccount(solanaAccount(account)).amount;
-        bytes32 solanaAddress = SOLANA_NATIVE.solanaAddress(account);
 
-        if (solanaAddress != bytes32(0)) {
-            bytes32 tokenMintATA = getTokenMintATA(solanaAddress);
-            if (!SPLTOKEN_PROGRAM.isSystemAccount(tokenMintATA)) {
-                ISPLTokenProgram.Account memory tokenMintATAData = SPLTOKEN_PROGRAM.getAccount(tokenMintATA);
-                if (tokenMintATAData.delegate == getUserExtAuthority(account)) {
-                    balance += (tokenMintATAData.delegated_amount > tokenMintATAData.amount)
-                        ? tokenMintATAData.amount
-                        : tokenMintATAData.delegated_amount;
-                }
-            }
+        (bool isSolanaUser, uint64 ataBalance,) = _isSolanaUser(account, false);
+        if (isSolanaUser) {
+            balance += ataBalance;
         }
         return balance;
     }
@@ -271,15 +263,10 @@ contract ERC20ForSplBackbone {
         bytes32 fromSolanaATA;
         uint64 availableATABalance;
         if (pdaBalance < amount) {
-            bytes32 fromSolanaAccount = SOLANA_NATIVE.solanaAddress(from);
-            if (fromSolanaAccount != bytes32(0)) {
-                fromSolanaATA = getTokenMintATA(fromSolanaAccount);
-                if (!SPLTOKEN_PROGRAM.isSystemAccount(fromSolanaATA)) {
-                    ISPLTokenProgram.Account memory tokenMintATAData = SPLTOKEN_PROGRAM.getAccount(fromSolanaATA);
-                    if (tokenMintATAData.delegate == getUserExtAuthority(from)) {
-                        availableATABalance+= (tokenMintATAData.delegated_amount > tokenMintATAData.amount) ? tokenMintATAData.amount : tokenMintATAData.delegated_amount;
-                    }
-                }
+            (bool isSolanaUserFrom, uint64 ataBalanceFrom, bytes32 ataAccount) = _isSolanaUser(from, false);
+            if (isSolanaUserFrom) {
+                fromSolanaATA = ataAccount;
+                availableATABalance += ataBalanceFrom;
             }
         }
 
@@ -289,14 +276,9 @@ contract ERC20ForSplBackbone {
         // derived from this Solana account. Otherwise, we transfer to NeonEVM's arbitrary token account associated to
         // the `to` address
         bytes32 toSolana;
-        bytes32 toSolanaAccount = SOLANA_NATIVE.solanaAddress(to);
-        if (toSolanaAccount != bytes32(0)) {
-            bytes32 toTokenMintATA = getTokenMintATA(toSolanaAccount);
-            if (!SPLTOKEN_PROGRAM.isSystemAccount(toTokenMintATA)) {
-                toSolana = toTokenMintATA;
-            } else {
-                toSolana = solanaAccount(to);
-            }
+        (bool isSolanaUserTo, , bytes32 ataAccountTo) = _isSolanaUser(to, true);
+        if (isSolanaUserTo) {
+            toSolana = ataAccountTo;
         } else {
             toSolana = solanaAccount(to);
         }
@@ -389,6 +371,25 @@ contract ERC20ForSplBackbone {
     /// @return A 32 bytes salt used to derive the NeonEVM arbitrary token account attributed to the `account` address
     function _salt(address account) internal pure returns (bytes32) {
         return bytes32(uint256(uint160(account)));
+    }
+
+    function _isSolanaUser(address account, bool skipDelegateCheck) internal view returns(bool, uint64, bytes32) {
+        bytes32 solanaAddress = SOLANA_NATIVE.solanaAddress(account);
+
+        if (solanaAddress != bytes32(0)) {
+            bytes32 tokenMintATA = getTokenMintATA(solanaAddress);
+            if (!SPLTOKEN_PROGRAM.isSystemAccount(tokenMintATA)) {
+                ISPLTokenProgram.Account memory tokenMintATAData = SPLTOKEN_PROGRAM.getAccount(tokenMintATA);
+                if (skipDelegateCheck || tokenMintATAData.delegate == getUserExtAuthority(account)) {
+                    return (
+                        true,
+                        (tokenMintATAData.delegated_amount > tokenMintATAData.amount) ? tokenMintATAData.amount : tokenMintATAData.delegated_amount,
+                        tokenMintATA
+                    );
+                }
+            }
+        }
+        return (false, 0, bytes32(0));
     }
 }
 

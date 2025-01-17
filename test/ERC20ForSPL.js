@@ -1275,7 +1275,6 @@ async function _scheduleTransaction(svmKeypair, target, callData) {
     const [authorityPoolAddress] = config.utils.SolanaNativeHelper.neonAuthorityPoolAddressSync(neonEvmProgram);
     const associatedTokenAddress = await getAssociatedTokenAddress(new web3.PublicKey('So11111111111111111111111111111111111111112'), authorityPoolAddress, true);
 
-    
     const index = Math.floor(Math.random() * neon_getEvmParams.result.neonTreasuryPoolCount) % neon_getEvmParams.result.neonTreasuryPoolCount;
     const treasuryPool = {
         index: index,
@@ -1311,13 +1310,6 @@ async function _scheduleTransaction(svmKeypair, target, callData) {
 
 async function setupTesters() {
     console.log('\n============================= setupTesters =============================\n');
-
-    const eth_chainIdRequest = await fetch(process.env.EVM_NODE, {
-        method: 'POST',
-        body: JSON.stringify({"method":"eth_chainId","params":[],"id":1,"jsonrpc":"2.0"}),
-        headers: { 'Content-Type': 'application/json' }
-    });
-    const chainId = (await eth_chainIdRequest.json()).result;
 
     // airdrop NEONs to evmUsers
     await config.utils.airdropNEON(user1.address);
@@ -1362,6 +1354,9 @@ async function setupTesters() {
 
         const signature = await connection.sendRawTransaction(transaction.serialize(), { skipPreflight: false });
         console.log(`https://explorer.solana.com/tx/${signature}?cluster=custom&customUrl=${process.env.SVM_NODE}`);
+        
+        // wait scheduled tx to be processed
+        await config.utils.asyncTimeout(SOLANA_TX_TIMEOUT);
     }
 
     let tx = await ERC20ForSPL.connect(owner).claim(
