@@ -4,14 +4,15 @@ const web3 = require("@solana/web3.js");
 const {
     createAssociatedTokenAccountInstruction,
     getAssociatedTokenAddress,
-    getAccount
+    getAccount, TOKEN_PROGRAM_ID, ASSOCIATED_TOKEN_PROGRAM_ID
 } = require("@solana/spl-token");
 const { config } = require('./config');
+const bs58 = require("bs58");
 require("dotenv").config();
 
 describe('Test init',  function () {
     const connection = new web3.Connection(
-        process.env.CURVESTAND_SOL,
+        process.env.SVM_NODE,
         "processed", //  See: https://solana-labs.github.io/solana-web3.js/v1.x/types/Commitment.html
         { confirmTransactionInitialTimeout: 0 } // See: https://solana-labs.github.io/solana-web3.js/v1.x/types/ConnectionConfig.html
     );
@@ -30,18 +31,24 @@ describe('Test init',  function () {
     const TIMEOUT = 3000;
     const other  = ethers.Wallet.createRandom()
     const other2 = ethers.Wallet.createRandom();
-    let owner, user1, user2, user3
+    let owner, user1, user2, user3;
+    let solanaUser1, solanaUser1ATA, solanaUser1PDA, solanaUser1NeonEVMAddress;
+    let solanaUser2, solanaUser2PDA, solanaUser2NeonEVMAddress;
+    let solanaUser3, solanaUser3ATA, solanaUser3PDA, solanaUser3NeonEVMAddress;
     let ownerSolanaPublicKey;
-    let user1SolanaPublicKey, user1ExtAuthorityPublicKey;
+    let user1SolanaPublicKey;
     let user2SolanaPublicKey;
     let user3SolanaPublicKey;
     let grantedTestersWithBalance;
     let solanaApprover, solanaApproverATAInBytes, solanaApproverATA;
     let ERC20ForSPLFactory;
     let ERC20ForSPLMintable;
+    let MockVault;
     let ERC20ForSPLFactoryAddress = '';
     let ERC20ForSPLMintableAddress = '';
+    let MockVaultAddress = '';
     let tokenMint;
+    let neonEVMParams
     let tx, solanaTx;
 
     before(async function() {
@@ -50,13 +57,29 @@ describe('Test init',  function () {
 
         [owner, user1, user2, user3] = await ethers.getSigners();
 
-        const ERC20ForSPLMintableContractFactory = await ethers.getContractFactory(
-            'contracts/token/ERC20ForSpl/erc20_for_spl.sol:ERC20ForSplMintable'
-        );
+        await config.utils.airdropNEON(owner.address);
+        await config.utils.airdropNEON(user1.address);
+        await config.utils.airdropNEON(user2.address);
+        await config.utils.airdropNEON(user3.address);
+
+        solanaUser1 = web3.Keypair.generate()
+        solanaUser2 = web3.Keypair.generate()
+        solanaUser3 = web3.Keypair.generate()
+
+        await config.utils.airdropSOL(solanaUser1);
+        await config.utils.airdropSOL(solanaUser2);
+        await config.utils.airdropSOL(solanaUser3);
+
         const ERC20ForSPLFactoryContractFactory = await ethers.getContractFactory(
             'contracts/token/ERC20ForSpl/erc20_for_spl_factory.sol:ERC20ForSplFactory'
         );
-        
+        const ERC20ForSPLMintableContractFactory = await ethers.getContractFactory(
+            'contracts/token/ERC20ForSpl/erc20_for_spl.sol:ERC20ForSplMintable'
+        );
+        const MockVaultContractFactory = await ethers.getContractFactory(
+            'contracts/mocks//MockVault.sol:MockVault'
+        );
+
         if (ethers.isAddress(ERC20ForSPLFactoryAddress)) {
             console.log(
                 '\nCreating instance of already deployed ERC20ForSPLFactory contract on Neon EVM with address',
@@ -91,17 +114,17 @@ describe('Test init',  function () {
             );
             ERC20ForSPLMintable = ERC20ForSPLMintableContractFactory.attach(ERC20ForSPLMintableAddress);
         } else {
-            ERC20ForSPLMintable = await ethers.deployContract(
-                'contracts/token/ERC20ForSpl/erc20_for_spl.sol:ERC20ForSplMintable',
-                [
-                    NAME,
-                    SYMBOL,
-                    DECIMALS,
-                    owner.address
-                ]
-            );
-            await ERC20ForSPLMintable.waitForDeployment();
-            ERC20ForSPLMintableAddress = ERC20ForSPLMintable.target;
+            tx = await ERC20ForSPLFactory.createErc20ForSplMintable(
+                NAME,
+                SYMBOL,
+                DECIMALS,
+                owner.address
+            )
+            await tx.wait(RECEIPTS_COUNT);
+            ERC20ForSPLMintableAddress = await ERC20ForSPLFactory.allErc20ForSpl(
+                parseInt((await ERC20ForSPLFactory.allErc20ForSplLength()).toString()) - 1
+            )
+            ERC20ForSPLMintable = ERC20ForSPLMintableContractFactory.attach(ERC20ForSPLMintableAddress);
             console.log(
                 '\nCreating instance of just now deployed ERC20ForSPLMintable contract on Neon EVM with address',
                 "\x1b[33m",
@@ -111,7 +134,28 @@ describe('Test init',  function () {
             );
         }
         tokenMint = await ERC20ForSPLMintable.findMintAccount();
-        console.log('\nToken mint - ',  ethers.encodeBase58(tokenMint));
+        console.log('Token mint - ',  ethers.encodeBase58(tokenMint), '\n');
+
+        if (ethers.isAddress(MockVaultAddress)) {
+            console.log('\nCreating instance of already deployed MockVault contract on Neon EVM with address',
+                "\x1b[33m", MockVaultAddress,
+                "\x1b[0m",
+                '\n'
+            );
+            MockVault = MockVaultContractFactory.attach(MockVaultAddress);
+        } else {
+            MockVault = await ethers.deployContract('contracts/mocks/MockVault.sol:MockVault', [
+                ERC20ForSPLMintable.target
+            ]);
+            await MockVault.waitForDeployment();
+            MockVaultAddress = MockVault.target
+            console.log('\nCreating instance of just now deployed MockVault contract on Neon EVM with address',
+                "\x1b[33m",
+                MockVaultAddress,
+                "\x1b[0m",
+                '\n'
+            );
+        }
 
         // ============================= GET USERS EVM ADDRESSES AND SOLANA ACCOUNTS ====================================
 
@@ -132,12 +176,74 @@ describe('Test init',  function () {
         console.log('\nUser3 addresses:');
         console.log('Neon EVM address -', user3.address);
         console.log('Solana data account -', user3SolanaPublicKey);
+
+        // ============================= GET SOLANA USERS ASSOCIATED TOKEN ACCOUNTS ====================================
+
+        console.log('\nSolana user1 address -', solanaUser1.publicKey.toBase58());
+        solanaUser1ATA = await getAssociatedTokenAddress(
+            new web3.PublicKey(ethers.encodeBase58(tokenMint)),
+            solanaUser1.publicKey,
+            false
+        );
+        console.log('Solana user1 ATA -', solanaUser1ATA.toBase58());
+        // Create solanaUser1ATA account if needed
+        const solanaUser1ATAInfo = await connection.getAccountInfo(solanaUser1ATA);
+        if (!solanaUser1ATAInfo || !solanaUser1ATAInfo.data) {
+            const transaction = new web3.Transaction();
+            transaction.add(
+                createAssociatedTokenAccountInstruction(
+                    solanaUser1.publicKey,
+                    solanaUser1ATA,
+                    solanaUser1.publicKey,
+                    new web3.PublicKey(ethers.encodeBase58(tokenMint))
+                )
+            );
+            transaction.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
+            transaction.sign(...[solanaUser1]);
+            await connection.sendRawTransaction(transaction.serialize(), { skipPreflight: false });
+            await config.utils.asyncTimeout(TIMEOUT);
+        }
+
+        console.log('\nSolana user2 address -', solanaUser2.publicKey.toBase58());
+
+        console.log('\nSolana user3 address -', solanaUser3.publicKey.toBase58());
+
+        solanaUser3ATA = await getAssociatedTokenAddress(
+            new web3.PublicKey(ethers.encodeBase58(tokenMint)),
+            solanaUser3.publicKey,
+            false
+        );
+        console.log('Solana user3 ATA -', solanaUser3ATA.toBase58(), '\n');
+        // Create solanaUser2ATA account if needed
+        const solanaUser3ATAInfo = await connection.getAccountInfo(solanaUser3ATA);
+        if (!solanaUser3ATAInfo || !solanaUser3ATAInfo.data) {
+            const transaction = new web3.Transaction();
+            transaction.add(
+                createAssociatedTokenAccountInstruction(
+                    solanaUser3.publicKey,
+                    solanaUser3ATA,
+                    solanaUser3.publicKey,
+                    new web3.PublicKey(ethers.encodeBase58(tokenMint))
+                )
+            );
+            transaction.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
+            transaction.sign(...[solanaUser3]);
+            await connection.sendRawTransaction(transaction.serialize(), { skipPreflight: false });
+            await config.utils.asyncTimeout(TIMEOUT);
+        }
+
+        const neon_getEvmParamsRequest = await fetch(process.env.EVM_NODE, {
+            method: 'POST',
+            body: JSON.stringify({"method":"neon_getEvmParams","params":[],"id":1,"jsonrpc":"2.0"}),
+            headers: { 'Content-Type': 'application/json' }
+        });
+        neonEVMParams = await neon_getEvmParamsRequest.json();
     });
 
     describe('ERC20ForSPLMintable tests',  function() {
 
         it('Empty storage slots', async function () {
-            for (let i = 0; i < 10; ++i) {
+            for (let i = 0; i < 100; ++i) {
                 expect(await ethers.provider.getStorage(ERC20ForSPLMintable.target, i)).to.eq(
                     '0x0000000000000000000000000000000000000000000000000000000000000000'
                 );
@@ -149,9 +255,8 @@ describe('Test init',  function () {
 
                 // ==================== CREATE SOLANA APPROVER ACCOUNT, INITIALIZE ATA AND DELEGATE ====================
 
-                solanaApprover = web3.Keypair.fromSecretKey(
-                    Buffer.from(ethers.decodeBase58(process.env.PRIVATE_KEY_SOLANA).toString(16), 'hex')
-                );
+                solanaApprover = web3.Keypair.generate()
+                await config.utils.airdropSOL(solanaApprover);
 
                 solanaApproverATA = await getAssociatedTokenAddress(
                     new web3.PublicKey(ethers.encodeBase58(tokenMint)),
@@ -169,14 +274,12 @@ describe('Test init',  function () {
                         new web3.PublicKey(ethers.encodeBase58(tokenMint))
                     )
                 )
-                // let res = await web3.sendAndConfirmTransaction(connection, solanaTx, [payer, solanaApprover]);
-                // console.log(res)
+
                 web3.sendAndConfirmTransaction(connection, solanaTx, [solanaApprover]);
                 await config.utils.asyncTimeout(TIMEOUT);
 
-                console.log('\nSolana approver addresses:');
-                console.log('Solana system account -', solanaApprover.publicKey.toBase58());
-                console.log('Solana data account -', solanaApproverATA.toBase58());
+                console.log('\nSolana approver address -', solanaApprover.publicKey.toBase58());
+                console.log('Solana approver ATA -', solanaApproverATA.toBase58(), '\n');
 
                 // ==================== MINT TO USERS AND TRANSFER TOKENS TO SOLANA APPROVER ATA =======================
 
@@ -249,23 +352,17 @@ describe('Test init',  function () {
                     '0x' + ethers.decodeBase58(testAccountKeyPair.publicKey.toBase58()).toString(16)
                 )
 
-                // Check that boith values are equal
+                // Check that both values are equal
                 expect(testAccountATAInBytesFromContract).to.eq(testAccountATAInBytes);
             });
 
             it('solanaAccount return value', async function () {
                 // Calculate PDA off chain
-                const neon_getEvmParamsRequest = await fetch(process.env.CURVESTAND, {
-                    method: 'POST',
-                    body: JSON.stringify({"method":"neon_getEvmParams","params":[],"id":1,"jsonrpc":"2.0"}),
-                    headers: { 'Content-Type': 'application/json' }
-                });
-                const neon_getEvmParams = await neon_getEvmParamsRequest.json();
                 const offChainPDAAccount = config.utils.calculatePdaAccount(
                     'ContractData',
                     ERC20ForSPLMintable.target,
                     user1.address,
-                    new web3.PublicKey(neon_getEvmParams.result.neonEvmProgramId)
+                    new web3.PublicKey(neonEVMParams.result.neonEvmProgramId)
                 )[0].toBase58();
 
                 expect(ethers.encodeBase58(await ERC20ForSPLMintable.solanaAccount(user1.address))).to.eq(offChainPDAAccount)
@@ -283,17 +380,23 @@ describe('Test init',  function () {
                 let initialRecipientBalance = await ERC20ForSPLMintable.balanceOf(user1.address);
 
                 // Approve recipient Ext Authority to claim AMOUNT
-                let delegateAuthorityPublicKey = await config.utils.delegateSolana({
-                    curvestand: process.env.CURVESTAND,
-                    web3,
-                    connection,
-                    ERC20ForSPLContractAddress: ERC20ForSPLMintableAddress,
-                    delegateEVMAddress: user1.address,
-                    solanaApproverATA,
-                    solanaApprover,
-                    amount: AMOUNT
-                });
-                await config.utils.asyncTimeout(TIMEOUT);
+                let delegateAuthorityPublicKey;
+                while(
+                    (await getAccount(connection, solanaApproverATA)).delegatedAmount === 0n
+                    || !delegateAuthorityPublicKey
+                ) {
+                    delegateAuthorityPublicKey = await config.utils.delegateSolana({
+                        curvestand: process.env.EVM_NODE,
+                        web3,
+                        connection,
+                        ERC20ForSPLContractAddress: ERC20ForSPLMintableAddress,
+                        delegateEVMAddress: user1.address,
+                        solanaApproverATA,
+                        solanaApprover,
+                        amount: AMOUNT
+                    });
+                    await config.utils.asyncTimeout(TIMEOUT);
+                }
 
                 // Check approver's delegatedAmount and delegate
                 expect((await getAccount(connection, solanaApproverATA)).delegatedAmount).to.equal(AMOUNT);
@@ -333,17 +436,23 @@ describe('Test init',  function () {
                 let initialRecipientBalance = await ERC20ForSPLMintable.balanceOf(user2.address);
 
                 // Approve caller's Ext Authority to claim AMOUNT
-                let delegateAuthorityPublicKey = await config.utils.delegateSolana({
-                    curvestand: process.env.CURVESTAND,
-                    web3,
-                    connection,
-                    ERC20ForSPLContractAddress: ERC20ForSPLMintableAddress,
-                    delegateEVMAddress: user1.address,
-                    solanaApproverATA,
-                    solanaApprover,
-                    amount: AMOUNT
-                });
-                await config.utils.asyncTimeout(TIMEOUT);
+                let delegateAuthorityPublicKey;
+                while(
+                    (await getAccount(connection, solanaApproverATA)).delegatedAmount === 0n
+                    || !delegateAuthorityPublicKey
+                ) {
+                    delegateAuthorityPublicKey = await config.utils.delegateSolana({
+                        curvestand: process.env.EVM_NODE,
+                        web3,
+                        connection,
+                        ERC20ForSPLContractAddress: ERC20ForSPLMintableAddress,
+                        delegateEVMAddress: user1.address,
+                        solanaApproverATA,
+                        solanaApprover,
+                        amount: AMOUNT
+                    });
+                    await config.utils.asyncTimeout(TIMEOUT);
+                }
 
                 // Check approver's delegatedAmount and delegate
                 expect((await getAccount(connection, solanaApproverATA)).delegatedAmount).to.equal(AMOUNT);
@@ -384,17 +493,23 @@ describe('Test init',  function () {
                 let initialRecipientBalance = await ERC20ForSPLMintable.balanceOf(other2.address);
 
                 // Approve caller's Ext Authority to claim AMOUNT
-                let delegateAuthorityPublicKey = await config.utils.delegateSolana({
-                    curvestand: process.env.CURVESTAND,
-                    web3,
-                    connection,
-                    ERC20ForSPLContractAddress: ERC20ForSPLMintableAddress,
-                    delegateEVMAddress: user1.address,
-                    solanaApproverATA,
-                    solanaApprover,
-                    amount: AMOUNT
-                });
-                await config.utils.asyncTimeout(TIMEOUT);
+                let delegateAuthorityPublicKey;
+                while(
+                    (await getAccount(connection, solanaApproverATA)).delegatedAmount === 0n
+                    || !delegateAuthorityPublicKey
+                ) {
+                    delegateAuthorityPublicKey = await config.utils.delegateSolana({
+                        curvestand: process.env.EVM_NODE,
+                        web3,
+                        connection,
+                        ERC20ForSPLContractAddress: ERC20ForSPLMintableAddress,
+                        delegateEVMAddress: user1.address,
+                        solanaApproverATA,
+                        solanaApprover,
+                        amount: AMOUNT
+                    });
+                    await config.utils.asyncTimeout(TIMEOUT);
+                }
 
                 // Check approver's delegatedAmount and delegate
                 expect((await getAccount(connection, solanaApproverATA)).delegatedAmount).to.equal(AMOUNT);
@@ -434,17 +549,23 @@ describe('Test init',  function () {
                 const claimAmount =  ethers.toBigInt(initialApproverBalance) + AMOUNT;
 
                 // Approve caller's Ext Authority to claim claimAmount
-                let delegateAuthorityPublicKey = await config.utils.delegateSolana({
-                    curvestand: process.env.CURVESTAND,
-                    web3,
-                    connection,
-                    ERC20ForSPLContractAddress: ERC20ForSPLMintableAddress,
-                    delegateEVMAddress: user1.address,
-                    solanaApproverATA,
-                    solanaApprover,
-                    amount: claimAmount
-                });
-                await config.utils.asyncTimeout(TIMEOUT);
+                let delegateAuthorityPublicKey;
+                while(
+                    (await getAccount(connection, solanaApproverATA)).delegatedAmount === 0n
+                    || !delegateAuthorityPublicKey
+                ) {
+                    delegateAuthorityPublicKey = await config.utils.delegateSolana({
+                        curvestand: process.env.EVM_NODE,
+                        web3,
+                        connection,
+                        ERC20ForSPLContractAddress: ERC20ForSPLMintableAddress,
+                        delegateEVMAddress: user1.address,
+                        solanaApproverATA,
+                        solanaApprover,
+                        amount: claimAmount
+                    });
+                    await config.utils.asyncTimeout(TIMEOUT);
+                }
 
                 // Check approver's delegatedAmount and delegate
                 const delegatedAmount = (await getAccount(connection, solanaApproverATA)).delegatedAmount;
@@ -482,17 +603,23 @@ describe('Test init',  function () {
 
             it('Malicious claimTo (insufficient allowance): reverts with error message', async function () {
                 // Approve caller's Ext Authority to claim AMOUNT
-                let delegateAuthorityPublicKey = await config.utils.delegateSolana({
-                    curvestand: process.env.CURVESTAND,
-                    web3,
-                    connection,
-                    ERC20ForSPLContractAddress: ERC20ForSPLMintableAddress,
-                    delegateEVMAddress: user1.address,
-                    solanaApproverATA,
-                    solanaApprover,
-                    amount: AMOUNT
-                });
-                await config.utils.asyncTimeout(TIMEOUT);
+                let delegateAuthorityPublicKey;
+                while(
+                    (await getAccount(connection, solanaApproverATA)).delegatedAmount === 0n
+                    || !delegateAuthorityPublicKey
+                ) {
+                    delegateAuthorityPublicKey = await config.utils.delegateSolana({
+                        curvestand: process.env.EVM_NODE,
+                        web3,
+                        connection,
+                        ERC20ForSPLContractAddress: ERC20ForSPLMintableAddress,
+                        delegateEVMAddress: user1.address,
+                        solanaApproverATA,
+                        solanaApprover,
+                        amount: AMOUNT
+                    });
+                    await config.utils.asyncTimeout(TIMEOUT);
+                }
 
                 // Check approver's delegatedAmount and delegate
                 const delegatedAmount = (await getAccount(connection, solanaApproverATA)).delegatedAmount;
@@ -576,6 +703,16 @@ describe('Test init',  function () {
                 );
             });
 
+            it('Malicious burn: reverts with AmountExceedsBalance custom error', async function () {
+                // User3 has no balance
+                expect(await ERC20ForSPLMintable.balanceOf(user3.address)).to.eq(ZERO_AMOUNT);
+                // Call burn from user3
+                await expect(ERC20ForSPLMintable.connect(user3).burn(AMOUNT)).to.be.revertedWithCustomError(
+                    ERC20ForSPLMintable,
+                    'AmountExceedsBalance'
+                );
+            });
+
             it('burnFrom', async function () {
                 if (grantedTestersWithBalance) {
                     // Approve user2 to burn on behalf of user1
@@ -630,6 +767,28 @@ describe('Test init',  function () {
                 }
             });
 
+            it('transfer: reverts with EmptyAddress custom error', async function () {
+                // Call transfer from user1
+                await expect(
+                    ERC20ForSPLMintable.connect(user1).transfer(ZERO_ADDRESS, AMOUNT)
+                ).to.be.revertedWithCustomError(
+                    ERC20ForSPLMintable,
+                    'EmptyAddress'
+                );
+            });
+
+            it('Malicious transfer: reverts with AmountExceedsBalance custom error', async function () {
+                // User3 has no balance
+                expect(await ERC20ForSPLMintable.balanceOf(user3.address)).to.eq(ZERO_AMOUNT);
+                // Call transfer from user3
+                await expect(
+                    ERC20ForSPLMintable.connect(user3).transfer(user1.address, AMOUNT)
+                ).to.be.revertedWithCustomError(
+                    ERC20ForSPLMintable,
+                    'AmountExceedsBalance'
+                );
+            });
+
             it('transferSolana', async function () {
                 if (grantedTestersWithBalance) {
                     // Save initial sender and recipient balances
@@ -653,7 +812,7 @@ describe('Test init',  function () {
                 }
             });
 
-            it('Malicious transferSolana (insufficient balance): reverts with error message', async function () {
+            it('Malicious transferSolana: reverts with AmountExceedsBalance custom error', async function () {
                 // User3 has no balance
                 expect(await ERC20ForSPLMintable.balanceOf(user3.address)).to.eq(ZERO_AMOUNT);
                 // Call transferSolana from user3
@@ -662,7 +821,10 @@ describe('Test init',  function () {
                         await ERC20ForSPLMintable.solanaAccount(user2.address),
                         AMOUNT
                     )
-                ).to.be.revertedWith('External call fails TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA: Error processing Instruction 0: invalid account data for instruction');
+                ).to.be.revertedWithCustomError(
+                    ERC20ForSPLMintable,
+                    'AmountExceedsBalance'
+                );
             });
 
             it('approve', async function () {
@@ -717,6 +879,243 @@ describe('Test init',  function () {
                 }
             });
 
+            it('transferFrom to MockVault smart contract', async function () {
+                if (grantedTestersWithBalance) {
+                    // Approve user1 to spend AMOUNT on behalf of user2
+                    tx = await ERC20ForSPLMintable.connect(user2).approve(MockVaultAddress, AMOUNT);
+                    await tx.wait(RECEIPTS_COUNT);
+
+                    // Save initial allowance and initial sender and recipient balances
+                    const initialAllowance = await ERC20ForSPLMintable.allowance(user2.address, MockVaultAddress);
+                    const initialSenderBalance = await ERC20ForSPLMintable.balanceOf(user2.address);
+                    const initialRecipientBalance = await ERC20ForSPLMintable.balanceOf(MockVaultAddress);
+
+                    // Call transferFrom
+                    tx = await MockVault.connect(user2).deposit(AMOUNT);
+                    await tx.wait(RECEIPTS_COUNT);
+
+                    // Check allowance and sender and recipient balances after transferFrom
+                    expect(await ERC20ForSPLMintable.allowance(user2.address, MockVaultAddress)).to.eq(
+                        initialAllowance - AMOUNT
+                    );
+                    expect(await ERC20ForSPLMintable.balanceOf(MockVaultAddress)).to.eq(
+                        initialRecipientBalance + AMOUNT
+                    );
+                    expect(await ERC20ForSPLMintable.balanceOf(user2.address)).to.eq(initialSenderBalance - AMOUNT);
+                } else {
+                    this.skip();
+                }
+            });
+
+            it("Malicious transferFrom: reverts with EmptyAddress custom error", async function () {
+                if (grantedTestersWithBalance) {
+                    // Call transferFrom from user3
+                    await expect(
+                        ERC20ForSPLMintable.connect(user3).transferFrom(ZERO_ADDRESS, user3.address, AMOUNT)
+                    ).to.be.revertedWithCustomError(
+                        ERC20ForSPLMintable,
+                        'EmptyAddress'
+                    );
+                } else {
+                    this.skip();
+                }
+            });
+
+            it('Malicious transferFrom: reverts with InvalidAllowance custom error', async function () {
+                // User3 has no allowance
+                expect(await ERC20ForSPLMintable.allowance(user2.address, user3.address)).to.eq(ZERO_AMOUNT);
+                // Call transferFrom from user3
+                await expect(
+                    ERC20ForSPLMintable.connect(user3).transferFrom(user2.address, user3.address, AMOUNT)
+                ).to.be.revertedWithCustomError(
+                    ERC20ForSPLMintable,
+                    'InvalidAllowance'
+                );
+            });
+
+            it("Malicious transferFrom: reverts with AmountExceedsBalance custom error", async function () {
+                if (grantedTestersWithBalance) {
+                    // User3 has no balance
+                    expect(await ERC20ForSPLMintable.balanceOf(user3.address)).to.eq(ZERO_AMOUNT);
+                    // Approve user1 to spend AMOUNT on behalf of user3
+                    tx = await ERC20ForSPLMintable.connect(user3).approve(user1.address, AMOUNT);
+                    await tx.wait(RECEIPTS_COUNT);
+                    expect(await ERC20ForSPLMintable.allowance(user3.address, user1.address)).to.eq(AMOUNT);
+                    // Call transferFrom from user1
+                    await expect(
+                        ERC20ForSPLMintable.connect(user1).transferFrom(user3.address, user1.address, AMOUNT)
+                    ).to.be.revertedWithCustomError(
+                        ERC20ForSPLMintable,
+                        'AmountExceedsBalance'
+                    );
+                } else {
+                    this.skip();
+                }
+            });
+
+            it("transferSolanaFrom to NeonEVM user's arbitrary token account on Solana", async function () {
+                if (grantedTestersWithBalance) {
+                    // Approve user1 to spend AMOUNT on behalf of user2
+                    tx = await ERC20ForSPLMintable.connect(user2).approve(user1.address, AMOUNT);
+                    await tx.wait(RECEIPTS_COUNT);
+
+                    // Save initial allowance and initial sender and recipient balances
+                    const initialAllowance = await ERC20ForSPLMintable.allowance(user2.address, user1.address);
+                    const initialSenderBalance = await ERC20ForSPLMintable.balanceOf(user2.address);
+                    const initialRecipientBalance = await ERC20ForSPLMintable.balanceOf(user1.address);
+
+                    // Call transferSolanaFrom
+                    const recipientSolanaAccount = await ERC20ForSPLMintable.solanaAccount(user1.address);
+                    tx = await ERC20ForSPLMintable.connect(user1).transferSolanaFrom(user2.address, recipientSolanaAccount, AMOUNT);
+                    await tx.wait(RECEIPTS_COUNT);
+
+                    // Check allowance and sender and recipient balances after transferSolanaFrom
+                    expect(await ERC20ForSPLMintable.allowance(user2.address, user1.address)).to.eq(
+                        initialAllowance - AMOUNT
+                    );
+                    expect(await ERC20ForSPLMintable.balanceOf(user1.address)).to.eq(
+                        initialRecipientBalance + AMOUNT
+                    );
+                    expect(await ERC20ForSPLMintable.balanceOf(user2.address)).to.eq(initialSenderBalance - AMOUNT);
+                } else {
+                    this.skip();
+                }
+            });
+
+            it("transferSolanaFrom to Solana user's associated token account on Solana", async function () {
+                if (grantedTestersWithBalance) {
+                    // Get Solana user's ATA in bytes
+                    const solanaUser1ATAInBytes = config.utils.publicKeyToBytes32(solanaUser1ATA.toBase58());
+
+                    // Approve user1 to spend AMOUNT on behalf of user2
+                    tx = await ERC20ForSPLMintable.connect(user2).approve(user1.address, AMOUNT);
+                    await tx.wait(RECEIPTS_COUNT);
+
+                    // Save initial allowance and initial sender and recipient balances
+                    const initialAllowance = await ERC20ForSPLMintable.allowance(user2.address, user1.address);
+                    const initialSenderBalance = await ERC20ForSPLMintable.balanceOf(user2.address);
+                    // Get initial recipient balance from Solana (because balanceOf won't show user's ATA token balance
+                    // until user has scheduled at least one NeonEVM transaction)
+                    const initialRecipientBalance = (await getAccount(connection, solanaUser1ATA)).amount;
+
+                    // Call transferSolanaFrom
+                    tx = await ERC20ForSPLMintable.connect(user1).transferSolanaFrom(
+                        user2.address,
+                        solanaUser1ATAInBytes,
+                        AMOUNT
+                    );
+                    await tx.wait(RECEIPTS_COUNT);
+
+                    // Check allowance and sender and recipient balances after transferSolanaFrom
+                    expect(await ERC20ForSPLMintable.allowance(user2.address, user1.address)).to.eq(
+                        initialAllowance - AMOUNT
+                    );
+
+                    // Get final recipient balance from Solana (because balanceOf won't show user's ATA token balance
+                    // until user has scheduled at least one NeonEVM transaction)
+                    const finalRecipientBalance = (await getAccount(connection, solanaUser1ATA)).amount;
+
+                    expect(finalRecipientBalance).to.eq(
+                        initialRecipientBalance + AMOUNT
+                    );
+                    expect(await ERC20ForSPLMintable.balanceOf(user2.address)).to.eq(initialSenderBalance - AMOUNT);
+                } else {
+                    this.skip();
+                }
+            });
+
+            it("transferSolanaFrom to Solana user's associated token account on Solana via MockVault smart contract", async function () {
+                if (grantedTestersWithBalance) {
+                    // Get Solana user's ATA in bytes
+                    const solanaUser1ATAInBytes = config.utils.publicKeyToBytes32(solanaUser1ATA.toBase58());
+
+                    // Approve MockVault to spend AMOUNT on behalf of user2
+                    tx = await ERC20ForSPLMintable.connect(user2).approve(MockVaultAddress, AMOUNT);
+                    await tx.wait(RECEIPTS_COUNT);
+
+                    // Save initial allowance and initial sender and recipient balances
+                    const initialAllowance = await ERC20ForSPLMintable.allowance(user2.address, MockVaultAddress);
+                    const initialSenderBalance = await ERC20ForSPLMintable.balanceOf(user2.address);
+                    // Get initial recipient balance from Solana (because balanceOf won't show user's ATA token balance
+                    // until user has scheduled at least one NeonEVM transaction)
+                    const initialRecipientBalance = (await getAccount(connection, solanaUser1ATA)).amount;
+
+                    // Call transferSolanaFrom
+                    tx = await MockVault.connect(user2).depositToSolana(AMOUNT, solanaUser1ATAInBytes);
+                    await tx.wait(RECEIPTS_COUNT);
+
+                    // Check allowance and sender and recipient balances after transferSolanaFrom
+                    expect(await ERC20ForSPLMintable.allowance(user2.address,MockVaultAddress)).to.eq(
+                        initialAllowance - AMOUNT
+                    );
+
+                    // Get final recipient balance from Solana (because balanceOf won't show user's ATA token balance
+                    // until user has scheduled at least one NeonEVM transaction)
+                    const finalRecipientBalance = (await getAccount(connection, solanaUser1ATA)).amount;
+
+                    expect(finalRecipientBalance).to.eq(
+                        initialRecipientBalance + AMOUNT
+                    );
+                    expect(await ERC20ForSPLMintable.balanceOf(user2.address)).to.eq(initialSenderBalance - AMOUNT);
+                } else {
+                    this.skip();
+                }
+            });
+
+            it("Malicious transferSolanaFrom: reverts with EmptyAddress custom error", async function () {
+                if (grantedTestersWithBalance) {
+                    // Call transferSolanaFrom from user3
+                    const recipientSolanaAccount = await ERC20ForSPLMintable.solanaAccount(user3.address);
+                    await expect(
+                        ERC20ForSPLMintable.connect(user3).transferSolanaFrom(ZERO_ADDRESS, recipientSolanaAccount, AMOUNT)
+                    ).to.be.revertedWithCustomError(
+                        ERC20ForSPLMintable,
+                        'EmptyAddress'
+                    );
+                } else {
+                    this.skip();
+                }
+            });
+
+            it("Malicious transferSolanaFrom: reverts with InvalidAllowance custom error", async function () {
+                if (grantedTestersWithBalance) {
+                    // User3 has no allowance
+                    expect(await ERC20ForSPLMintable.allowance(user2.address, user3.address)).to.eq(ZERO_AMOUNT);
+                    // Call transferSolanaFrom from user3
+                    const recipientSolanaAccount = await ERC20ForSPLMintable.solanaAccount(user3.address);
+                    await expect(
+                        ERC20ForSPLMintable.connect(user3).transferSolanaFrom(user2.address, recipientSolanaAccount, AMOUNT)
+                    ).to.be.revertedWithCustomError(
+                        ERC20ForSPLMintable,
+                        'InvalidAllowance'
+                    );
+                } else {
+                    this.skip();
+                }
+            });
+
+            it("Malicious transferSolanaFrom: reverts with AmountExceedsBalance custom error", async function () {
+                if (grantedTestersWithBalance) {
+                    // User3 has no balance
+                    expect(await ERC20ForSPLMintable.balanceOf(user3.address)).to.eq(ZERO_AMOUNT);
+                    // Approve user1 to spend AMOUNT on behalf of user3
+                    tx = await ERC20ForSPLMintable.connect(user3).approve(user1.address, AMOUNT);
+                    await tx.wait(RECEIPTS_COUNT);
+                    expect(await ERC20ForSPLMintable.allowance(user3.address, user1.address)).to.eq(AMOUNT);
+                    // Call transferSolanaFrom from user1
+                    const recipientSolanaAccount = await ERC20ForSPLMintable.solanaAccount(user1.address);
+                    await expect(
+                        ERC20ForSPLMintable.connect(user1).transferSolanaFrom(user3.address, recipientSolanaAccount, AMOUNT)
+                    ).to.be.revertedWithCustomError(
+                        ERC20ForSPLMintable,
+                        'AmountExceedsBalance'
+                    );
+                } else {
+                    this.skip();
+                }
+            });
+
+
             it('approveSolana: approve different accounts then revoke approval ', async function () {
                 // Approve user1 to spend on behalf of owner
                 tx = await ERC20ForSPLMintable.connect(owner).approveSolana(
@@ -754,41 +1153,7 @@ describe('Test init',  function () {
                 expect(accountDelegateData[0]).to.eq(
                     '0x0000000000000000000000000000000000000000000000000000000000000000'
                 );
-                expect(accountDelegateData[1]).to.eq(0);
-            });
-
-            it('Malicious transfer: reverts with AmountExceedsBalance custom error', async function () {
-                // User3 has no balance
-                expect(await ERC20ForSPLMintable.balanceOf(user3.address)).to.eq(ZERO_AMOUNT);
-                // Call transfer from user3
-                await expect(
-                    ERC20ForSPLMintable.connect(user3).transfer(user1.address, AMOUNT)
-                ).to.be.revertedWithCustomError(
-                    ERC20ForSPLMintable,
-                    'AmountExceedsBalance'
-                );
-            });
-
-            it('Malicious transferFrom: reverts with InvalidAllowance custom error', async function () {
-                // User3 has no allowance
-                expect(await ERC20ForSPLMintable.allowance(user2.address, user3.address)).to.eq(ZERO_AMOUNT);
-                // Call transferFrom from user3
-                await expect(
-                    ERC20ForSPLMintable.connect(user3).transferFrom(user2.address, user3.address, AMOUNT)
-                ).to.be.revertedWithCustomError(
-                    ERC20ForSPLMintable,
-                    'InvalidAllowance'
-                );
-            });
-
-            it('Malicious burn: reverts with AmountExceedsBalance custom error', async function () {
-                // User3 has no balance
-                expect(await ERC20ForSPLMintable.balanceOf(user3.address)).to.eq(ZERO_AMOUNT);
-                // Call burn from user3
-                await expect(ERC20ForSPLMintable.connect(user3).burn(AMOUNT)).to.be.revertedWithCustomError(
-                    ERC20ForSPLMintable,
-                    'AmountExceedsBalance'
-                );
+                expect(accountDelegateData[1]).to.eq(ZERO_AMOUNT);
             });
 
             it('Transfer amount > type(uint64).max: reverts with AmountExceedsUint64 custom error', async function () {
@@ -810,6 +1175,388 @@ describe('Test init',  function () {
                     'AmountExceedsUint64'
                 );
             });
+
+            describe('Solana native tests', function() {
+                describe('Solana user with only associated token account', function() {
+                    before('Schedule first NeonEVM transaction to register Solana user account', async function() {
+                        // Once a first transaction has been scheduled on NeonEVM by a Solana account, a NeonEVM address is
+                        // associated to that Solana account and the 32 bytes address of that Solana account is returned by the
+                        // SOLANA_NATIVE.solanaAddress function when passing the associated NeonEVM address
+                        await config.utils.SolanaNativeHelper.scheduleTransaction(
+                            connection,
+                            neonEVMParams,
+                            solanaUser1,
+                            ERC20ForSPLMintableAddress,
+                            ERC20ForSPLMintable.interface.encodeFunctionData("approve", [MockVaultAddress, AMOUNT])
+                        );
+                        await config.utils.asyncTimeout(TIMEOUT);
+
+                        // Calculate the NeonEVM address associated with solanaUser1 account
+                        solanaUser1NeonEVMAddress = ethers.dataSlice(
+                            ethers.keccak256(solanaUser1.publicKey.toBytes()),
+                            12,
+                            32
+                        );
+
+                        // Check that scheduled transaction was executed
+                        expect(await ERC20ForSPLMintable.allowance(solanaUser1NeonEVMAddress, MockVaultAddress)).to.eq(AMOUNT);
+                    })
+
+                    it('receive to Solana associated token account', async function() {
+                        // Save initial balance of solanaUser1's associated token account (ATA)
+                        const initialRecipientBalance = (await getAccount(connection, solanaUser1ATA)).amount;
+
+                        // Transfer tokens to the NeonEVM address associated to solanaUser1 account
+                        tx = await ERC20ForSPLMintable.connect(user1).transfer(solanaUser1NeonEVMAddress, AMOUNT);
+                        await tx.wait(RECEIPTS_COUNT);
+
+                        // Check that tokens were sent to solanaUser1's ATA
+                        const finalRecipientBalance = (await getAccount(connection, solanaUser1ATA)).amount;
+                        expect(finalRecipientBalance).to.eq(initialRecipientBalance + AMOUNT);
+                    })
+
+                    it('balanceOf includes Solana ATA balance only after delegating to external authority', async function() {
+                        // Transfer tokens to the NeonEVM address associated to solanaUser1 account
+                        tx = await ERC20ForSPLMintable.connect(user1).transfer(solanaUser1NeonEVMAddress, AMOUNT);
+                        await tx.wait(RECEIPTS_COUNT);
+
+                        // Initially returned balance of solanaUser1 is zero
+                        const initialReturnedBalance = await ERC20ForSPLMintable.balanceOf(solanaUser1NeonEVMAddress);
+                        expect(initialReturnedBalance).to.eq(ZERO_AMOUNT);
+
+                        // Delegate Solana ATA balance to external authority
+                        let delegateAuthorityPublicKey;
+                        while(
+                            (await getAccount(connection, solanaUser1ATA)).delegatedAmount === 0n
+                            || !delegateAuthorityPublicKey
+                            ) {
+                            delegateAuthorityPublicKey = await config.utils.delegateSolana({
+                                curvestand: process.env.EVM_NODE,
+                                web3,
+                                connection,
+                                ERC20ForSPLContractAddress: ERC20ForSPLMintableAddress,
+                                delegateEVMAddress: solanaUser1NeonEVMAddress,
+                                solanaApproverATA: solanaUser1ATA,
+                                solanaApprover: solanaUser1,
+                                amount: UINT64_MAX_AMOUNT
+                            });
+                            await config.utils.asyncTimeout(TIMEOUT);
+                        }
+
+                        // Check returned balance of solanaUser1's associated token account (ATA)
+                        const finalReturnedBalance = await ERC20ForSPLMintable.balanceOf(solanaUser1NeonEVMAddress);
+                        expect(finalReturnedBalance).to.be.greaterThan(ZERO_AMOUNT);
+                    })
+
+                    it('transfers from Solana ATA when arbitrary token account does not exist', async function() {
+                        // Transfer tokens to the NeonEVM address associated to solanaUser1 account
+                        tx = await ERC20ForSPLMintable.connect(user1).transfer(solanaUser1NeonEVMAddress, AMOUNT);
+                        await tx.wait(RECEIPTS_COUNT);
+
+                        // Get arbitrary token account attributed to solanaUser1 by NeonEVM
+                        solanaUser1PDA = new web3.PublicKey(ethers.encodeBase58(
+                            await ERC20ForSPLMintable.solanaAccount(solanaUser1NeonEVMAddress)
+                        ));
+
+                        // Check that solanaUser1's arbitrary token account does not exist
+                        expect(await connection.getAccountInfo(solanaUser1PDA)).to.be.null;
+
+                        // Save initial sender and recipient balances
+                        const initialSenderBalance = await ERC20ForSPLMintable.balanceOf(solanaUser1NeonEVMAddress);
+                        const initialRecipientBalance = await ERC20ForSPLMintable.balanceOf(user1.address);
+
+                        // Save initial balance of solanaUser1's ATA
+                        const initialSenderATABalance = (await getAccount(connection, solanaUser1ATA)).amount;
+
+                        // Transfer from solanaUser1 by scheduling a NeonEVM transaction on Solana
+                        await config.utils.SolanaNativeHelper.scheduleTransaction(
+                            connection,
+                            neonEVMParams,
+                            solanaUser1,
+                            ERC20ForSPLMintableAddress,
+                            ERC20ForSPLMintable.interface.encodeFunctionData("transfer", [user1.address, AMOUNT])
+                        );
+                        await config.utils.asyncTimeout(TIMEOUT);
+
+                        // Check that scheduled transaction was executed
+                        expect(await ERC20ForSPLMintable.balanceOf(solanaUser1NeonEVMAddress)).to.eq(initialSenderBalance - AMOUNT);
+                        expect(await ERC20ForSPLMintable.balanceOf(user1.address)).to.eq(initialRecipientBalance + AMOUNT);
+
+                        // Check solanaUser1's ATA balance
+                        expect((await getAccount(connection, solanaUser1ATA)).amount).to.eq(initialSenderATABalance - AMOUNT);
+                    })
+                })
+
+                describe("Solana user with only arbitrary token account", function() {
+                    it("transfer to unregistered Solana user's NeonEVM address to create arbitrary token account", async function() {
+                        // Calculate the NeonEVM address associated with solanaUser2 account
+                        solanaUser2NeonEVMAddress = ethers.dataSlice(
+                            ethers.keccak256(solanaUser2.publicKey.toBytes()),
+                            12,
+                            32
+                        );
+
+                        // Get arbitrary token account attributed to solanaUser2 by NeonEVM
+                        solanaUser2PDA = new web3.PublicKey(ethers.encodeBase58(
+                            await ERC20ForSPLMintable.solanaAccount(solanaUser2NeonEVMAddress)
+                        ));
+
+                        // Check that solanaUser2 balance is initially zero
+                        expect(await ERC20ForSPLMintable.balanceOf(solanaUser2NeonEVMAddress)).to.eq(ZERO_AMOUNT);
+
+                        // Check that solanaUser2's arbitrary token account does not exist yet
+                        expect(await connection.getAccountInfo(solanaUser2PDA)).to.be.null;
+
+                        // Transfer to the NeonEVM address associated to solanaUser2 account
+                        tx = await ERC20ForSPLMintable.connect(user1).transfer(solanaUser2NeonEVMAddress, AMOUNT);
+                        await tx.wait(RECEIPTS_COUNT);
+
+                        // Check that solanaUser2's arbitrary token account has been initialized
+                        expect(await connection.getAccountInfo(solanaUser2PDA)).not.to.be.null;
+
+                        // Check that solanaUser2's arbitrary token account has received tokens
+                        expect((await getAccount(connection, solanaUser2PDA)).amount).to.eq(AMOUNT);
+
+                        // Check that balanceOf includes arbitrary token account balance
+                        expect(await ERC20ForSPLMintable.balanceOf(solanaUser2NeonEVMAddress)).to.eq(AMOUNT);
+                    })
+
+                    it('transfer from arbitrary token account',async function() {
+                        // Save initial sender and recipient balances
+                        const initialSenderBalance = await ERC20ForSPLMintable.balanceOf(solanaUser2NeonEVMAddress);
+                        const initialRecipientBalance = await ERC20ForSPLMintable.balanceOf(user1.address);
+
+                        // Save initial balance of solanaUser2's arbitrary token account
+                        const initialSenderPDABalance = (await getAccount(connection, solanaUser2PDA)).amount;
+
+                        // Transfer from solanaUser2 by scheduling a NeonEVM transaction on Solana
+                        await config.utils.SolanaNativeHelper.scheduleTransaction(
+                            connection,
+                            neonEVMParams,
+                            solanaUser2,
+                            ERC20ForSPLMintableAddress,
+                            ERC20ForSPLMintable.interface.encodeFunctionData("transfer", [user1.address, AMOUNT])
+                        );
+                        await config.utils.asyncTimeout(TIMEOUT);
+
+                        // Check that scheduled transaction was executed
+                        expect(await ERC20ForSPLMintable.balanceOf(solanaUser2NeonEVMAddress)).to.eq(initialSenderBalance - AMOUNT);
+                        expect(await ERC20ForSPLMintable.balanceOf(user1.address)).to.eq(initialRecipientBalance + AMOUNT);
+
+                        // Check solanaUser2's arbitrary token account balance
+                        expect((await getAccount(connection, solanaUser2PDA)).amount).to.eq(initialSenderPDABalance - AMOUNT);
+                    })
+                })
+
+                describe("Solana user with both associated token account and arbitrary token account", function() {
+                    before("Transfer to unregistered Solana user's NeonEVM address to create arbitrary token account", async function() {
+                        // Calculate the NeonEVM address associated with solanaUser3 account
+                        solanaUser3NeonEVMAddress = ethers.dataSlice(
+                            ethers.keccak256(solanaUser3.publicKey.toBytes()),
+                            12,
+                            32
+                        );
+
+                        // Get arbitrary token account attributed to solanaUser3 by NeonEVM
+                        solanaUser3PDA = new web3.PublicKey(ethers.encodeBase58(
+                            await ERC20ForSPLMintable.solanaAccount(solanaUser3NeonEVMAddress)
+                        ));
+
+                        // Check that solanaUser3 balance is initially zero
+                        expect(await ERC20ForSPLMintable.balanceOf(solanaUser3NeonEVMAddress)).to.eq(ZERO_AMOUNT);
+
+                        // Check that solanaUser3's arbitrary token account does not exist yet
+                        expect(await connection.getAccountInfo(solanaUser3PDA)).to.be.null;
+
+                        // Transfer to the NeonEVM address associated to solanaUser3 account
+                        tx = await ERC20ForSPLMintable.connect(user1).transfer(solanaUser3NeonEVMAddress, DOUBLE_AMOUNT);
+                        await tx.wait(RECEIPTS_COUNT);
+
+                        // Wait for solanaUser3's arbitrary token account to be created
+                        while(!(await connection.getAccountInfo(solanaUser3PDA))) {
+                            console.log('wait...')
+                            console.log(await connection.getAccountInfo(solanaUser3PDA))
+                            await config.utils.asyncTimeout(TIMEOUT);
+                        }
+
+                        // Check that solanaUser3's arbitrary token account has received tokens
+                        expect((await getAccount(connection, solanaUser3PDA)).amount).to.eq(DOUBLE_AMOUNT);
+
+                        // Check that balanceOf includes arbitrary token account balance
+                        expect(await ERC20ForSPLMintable.balanceOf(solanaUser3NeonEVMAddress)).to.eq(DOUBLE_AMOUNT);
+                    })
+
+                    before('Schedule first NeonEVM transaction to register Solana user account', async function() {
+                        // Once a first transaction has been scheduled on NeonEVM by a Solana account, a NeonEVM address is
+                        // associated to that Solana account and the 32 bytes address of that Solana account is returned by the
+                        // SOLANA_NATIVE.solanaAddress function when passing the associated NeonEVM address
+                        await config.utils.SolanaNativeHelper.scheduleTransaction(
+                            connection,
+                            neonEVMParams,
+                            solanaUser3,
+                            ERC20ForSPLMintableAddress,
+                            ERC20ForSPLMintable.interface.encodeFunctionData("approve", [MockVaultAddress, AMOUNT])
+                        );
+                        await config.utils.asyncTimeout(TIMEOUT);
+
+                        // Calculate the NeonEVM address associated with solanaUser3 account
+                        solanaUser3NeonEVMAddress = ethers.dataSlice(
+                            ethers.keccak256(solanaUser3.publicKey.toBytes()),
+                            12,
+                            32
+                        );
+
+                        // Check that scheduled transaction was executed
+                        expect(await ERC20ForSPLMintable.allowance(solanaUser3NeonEVMAddress, MockVaultAddress)).to.eq(AMOUNT);
+                    })
+
+                    it('receive to Solana associated token account', async function() {
+                        // Save initial balance of solanaUser1's associated token account (ATA)
+                        const initialRecipientBalance = (await getAccount(connection, solanaUser3ATA)).amount;
+
+                        // Transfer tokens to the NeonEVM address associated to solanaUser1 account
+                        tx = await ERC20ForSPLMintable.connect(user1).transfer(solanaUser3NeonEVMAddress, DOUBLE_AMOUNT);
+                        await tx.wait(RECEIPTS_COUNT);
+
+                        // Check that tokens were sent to solanaUser3's ATA
+                        const finalRecipientBalance = (await getAccount(connection, solanaUser3ATA)).amount;
+                        expect(finalRecipientBalance).to.eq(initialRecipientBalance + DOUBLE_AMOUNT);
+                    })
+
+                    it('balanceOf includes Solana ATA balance only after delegating to external authority', async function() {
+                        // Get balance of solanaUser3 arbitrary token account
+                        const solanaUser3PDABalance = (await getAccount(connection, solanaUser3PDA)).amount;
+
+                        // Transfer tokens to the NeonEVM address associated to solanaUser3 account
+                        tx = await ERC20ForSPLMintable.connect(user1).transfer(solanaUser3NeonEVMAddress, AMOUNT);
+                        await tx.wait(RECEIPTS_COUNT);
+
+                        // Initially returned balance of solanaUser3 equals balance of solanaUser3 arbitrary token account
+                        const initialReturnedBalance = await ERC20ForSPLMintable.balanceOf(solanaUser3NeonEVMAddress);
+                        expect(initialReturnedBalance).to.eq(solanaUser3PDABalance);
+
+                        // Delegate Solana ATA balance to external authority
+                        let delegateAuthorityPublicKey;
+                        while(
+                            (await getAccount(connection, solanaUser3ATA)).delegatedAmount === 0n
+                            || !delegateAuthorityPublicKey
+                            ) {
+                            delegateAuthorityPublicKey = await config.utils.delegateSolana({
+                                curvestand: process.env.EVM_NODE,
+                                web3,
+                                connection,
+                                ERC20ForSPLContractAddress: ERC20ForSPLMintableAddress,
+                                delegateEVMAddress: solanaUser3NeonEVMAddress,
+                                solanaApproverATA: solanaUser3ATA,
+                                solanaApprover: solanaUser3,
+                                amount: UINT64_MAX_AMOUNT
+                            });
+                            await config.utils.asyncTimeout(TIMEOUT);
+                        }
+
+                        // Check returned balance of solanaUser3's associated token account (ATA)
+                        const finalReturnedBalance = await ERC20ForSPLMintable.balanceOf(solanaUser3NeonEVMAddress);
+                        expect(finalReturnedBalance).to.be.greaterThan(solanaUser3PDABalance);
+                    })
+
+                    it('transfer from arbitrary token account in priority', async function(){
+                        // Save initial recipient balance
+                        const initialRecipientBalance = await ERC20ForSPLMintable.balanceOf(user1.address);
+                        // Save initial sender balance
+                        const initialSenderBalance = await ERC20ForSPLMintable.balanceOf(solanaUser3NeonEVMAddress);
+                        // Save initial balance of solanaUser3's arbitrary token account
+                        const initialSolanaUser3PDABalance = (await getAccount(connection, solanaUser3PDA)).amount;
+                        // Save initial balance of solanaUser3's ATA
+                        const initialSolanaUser3ATABalance = (await getAccount(connection, solanaUser3ATA)).amount;
+
+                        // Transfer from solanaUser3 by scheduling a NeonEVM transaction on Solana
+                        await config.utils.SolanaNativeHelper.scheduleTransaction(
+                            connection,
+                            neonEVMParams,
+                            solanaUser3,
+                            ERC20ForSPLMintableAddress,
+                            ERC20ForSPLMintable.interface.encodeFunctionData("transfer", [user1.address, AMOUNT])
+                        );
+                        await config.utils.asyncTimeout(TIMEOUT);
+
+                        // Check that scheduled transaction was executed
+                        expect(await ERC20ForSPLMintable.balanceOf(solanaUser3NeonEVMAddress)).to.eq(initialSenderBalance - AMOUNT);
+                        expect(await ERC20ForSPLMintable.balanceOf(user1.address)).to.eq(initialRecipientBalance + AMOUNT);
+
+                        // Check that solanaUser3's arbitrary token account balance decreased by AMOUNT
+                        expect((await getAccount(connection, solanaUser3PDA)).amount).to.eq(initialSolanaUser3PDABalance - AMOUNT);
+
+                        // Check that solanaUser3's ATA balance did not change
+                        expect((await getAccount(connection, solanaUser3ATA)).amount).to.eq(initialSolanaUser3ATABalance);
+                    })
+
+                    it('transfer from both arbitrary token account and associated token account', async function(){
+                        // Save initial recipient balance
+                        const initialRecipientBalance = await ERC20ForSPLMintable.balanceOf(user1.address);
+                        // Save initial sender balance
+                        const initialSenderBalance = await ERC20ForSPLMintable.balanceOf(solanaUser3NeonEVMAddress);
+                        // Save initial balance of solanaUser3's arbitrary token account
+                        const initialSolanaUser3PDABalance = (await getAccount(connection, solanaUser3PDA)).amount;
+                        // Save initial balance of solanaUser3's ATA
+                        const initialSolanaUser3ATABalance = (await getAccount(connection, solanaUser3ATA)).amount;
+
+                        // Transfer from solanaUser3 by scheduling a NeonEVM transaction on Solana
+                        await config.utils.SolanaNativeHelper.scheduleTransaction(
+                            connection,
+                            neonEVMParams,
+                            solanaUser3,
+                            ERC20ForSPLMintableAddress,
+                            ERC20ForSPLMintable.interface.encodeFunctionData("transfer", [user1.address, DOUBLE_AMOUNT])
+                        );
+                        await config.utils.asyncTimeout(TIMEOUT);
+
+                        // Check that scheduled transaction was executed
+                        expect(await ERC20ForSPLMintable.balanceOf(solanaUser3NeonEVMAddress)).to.eq(initialSenderBalance - DOUBLE_AMOUNT);
+                        expect(await ERC20ForSPLMintable.balanceOf(user1.address)).to.eq(initialRecipientBalance + DOUBLE_AMOUNT);
+
+                        // Check that solanaUser3's arbitrary token account balance decreased by AMOUNT
+                        expect((await getAccount(connection, solanaUser3PDA)).amount).to.eq(initialSolanaUser3PDABalance - AMOUNT);
+
+                        // Check that solanaUser3's arbitrary token account balance is now zero
+                        expect((await getAccount(connection, solanaUser3PDA)).amount).to.eq(ZERO_AMOUNT);
+
+                        // Check that solanaUser3's associated token account balance decreased by AMOUNT
+                        expect((await getAccount(connection, solanaUser3ATA)).amount).to.eq(initialSolanaUser3ATABalance - AMOUNT);
+                    })
+
+                    it('transfer from associated token account when arbitrary token account balance is zero', async function(){
+                        // Save initial recipient balance
+                        const initialRecipientBalance = await ERC20ForSPLMintable.balanceOf(user1.address);
+                        // Save initial sender balance
+                        const initialSenderBalance = await ERC20ForSPLMintable.balanceOf(solanaUser3NeonEVMAddress);
+                        // Save initial balance of solanaUser3's ATA
+                        const initialSolanaUser3ATABalance = (await getAccount(connection, solanaUser3ATA)).amount;
+
+                        // Check that balance of solanaUser3's arbitrary token account is zero
+                        expect((await getAccount(connection, solanaUser3PDA)).amount).to.eq(ZERO_AMOUNT);
+
+                        // Transfer from solanaUser3 by scheduling a NeonEVM transaction on Solana
+                        await config.utils.SolanaNativeHelper.scheduleTransaction(
+                            connection,
+                            neonEVMParams,
+                            solanaUser3,
+                            ERC20ForSPLMintableAddress,
+                            ERC20ForSPLMintable.interface.encodeFunctionData("transfer", [user1.address, AMOUNT])
+                        );
+                        await config.utils.asyncTimeout(TIMEOUT);
+
+                        // Check that scheduled transaction was executed
+                        expect(await ERC20ForSPLMintable.balanceOf(solanaUser3NeonEVMAddress)).to.eq(initialSenderBalance - AMOUNT);
+                        expect(await ERC20ForSPLMintable.balanceOf(user1.address)).to.eq(initialRecipientBalance + AMOUNT);
+
+                        // Check that solanaUser3's arbitrary token account balance is still zero
+                        expect((await getAccount(connection, solanaUser3PDA)).amount).to.eq(ZERO_AMOUNT);
+
+                        // Check that solanaUser3's ATA balance decreased by AMOUNT
+                        expect((await getAccount(connection, solanaUser3ATA)).amount).to.eq(initialSolanaUser3ATABalance - AMOUNT);
+                    })
+                })
+            })
         })
 
         it('mint: malicious mint reverts with InvalidOwner custom error', async function () {
@@ -865,5 +1612,5 @@ describe('Test init',  function () {
             expect(await ERC20ForSPLMintable.totalSupply()).to.eq(initialSupply + AMOUNT);
             expect(await ERC20ForSPLMintable.balanceOf(user1.address)).to.eq(initialRecipientBalance + AMOUNT);
         });
-    });
+    })
 });
