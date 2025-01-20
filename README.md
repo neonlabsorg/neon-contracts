@@ -12,3 +12,7 @@ Neon EVM has a set of precompiles which are built to connect Solidity developers
 
 ### Helpers
 Helper libraries which could be used to prepare and validate data being passed to and return from Solana can be found [here](contracts/utils).
+
+### License
+
+Neon EVM contracts is released under the [MIT License](LICENSE).
